@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>現場写真集作成ツール</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{--bg:#0f1923;--surface:#1a2535;--surface2:#243044;--accent:#e85d3a;--accent2:#f5a623;--text:#e8edf2;--text2:#8899aa;--border:#2d3f55;--radius:12px;}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{background:var(--bg);color:var(--text);font-family:'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;min-height:100vh;padding-bottom:90px;}
+
+  header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;}
+  header .logo{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+  header h1{font-size:16px;font-weight:700;}
+  header span{font-size:11px;color:var(--text2);}
+
+  main{padding:14px;max-width:640px;margin:0 auto;}
+  .section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px;}
+  .section-title{font-size:11px;font-weight:700;color:var(--accent2);letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+  .section-title::before{content:'';display:block;width:3px;height:13px;background:var(--accent2);border-radius:2px;}
+
+  input[type="text"]{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:15px;font-family:inherit;padding:11px 13px;outline:none;transition:border-color .2s;}
+  input[type="text"]:focus{border-color:var(--accent2);}
+  input[type="text"]::placeholder{color:var(--text2);}
+
+  .point-row{display:flex;gap:8px;align-items:center;margin-top:10px;}
+  .point-row label{font-size:12px;color:var(--text2);white-space:nowrap;flex-shrink:0;}
+  .point-row input{flex:1;}
+  .hint{font-size:11px;color:var(--text2);margin-top:6px;line-height:1.6;}
+
+  .upload-area{border:2px dashed var(--border);border-radius:var(--radius);padding:28px 16px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;}
+  .upload-area:hover{border-color:var(--accent2);background:rgba(245,166,35,.05);}
+  .upload-area .icon{font-size:34px;margin-bottom:8px;}
+  .upload-area p{font-size:14px;color:var(--text2);}
+  .upload-area strong{color:var(--accent2);}
+  #fileInput{display:none;}
+
+  .photo-list{display:flex;flex-direction:column;gap:14px;margin-top:12px;}
+  .photo-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+
+  /* 近景カード：左ボーダーをグレー */
+  .photo-card.kinkei{border-left:3px solid var(--text2);}
+  /* 遠景カード：左ボーダーをアクセント赤 */
+  .photo-card.enkei{border-left:3px solid var(--accent);}
+
+  .card-header{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);}
+
+  .photo-num-wrap{position:relative;flex-shrink:0;}
+  .photo-num{background:var(--accent);color:white;border-radius:6px;width:32px;height:32px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;transition:background .15s;}
+  .photo-num:hover{background:var(--accent2);color:#111;}
+
+  .caption-badge{display:inline-flex;align-items:center;gap:4px;border-radius:4px;font-size:11px;font-weight:700;padding:3px 8px;white-space:nowrap;flex-shrink:0;}
+  .caption-badge.kinkei{background:rgba(136,153,170,.15);color:var(--text2);}
+  .caption-badge.enkei{background:rgba(232,93,58,.15);color:var(--accent);}
+
+  .photo-caption{flex:1;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;font-family:inherit;padding:4px 2px;outline:none;min-width:0;}
+  .photo-caption:focus{border-bottom-color:var(--accent2);}
+  .photo-caption::placeholder{color:var(--text2);}
+  .photo-delete{background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:0 2px;flex-shrink:0;}
+
+  /* 近景：プレビューのみ（アノテーションなし）*/
+  .preview-wrap{width:100%;background:#000;position:relative;}
+  .preview-img{width:100%;display:block;object-fit:contain;}
+  .no-annotation-label{position:absolute;bottom:8px;right:10px;background:rgba(0,0,0,.55);color:rgba(255,255,255,.6);font-size:11px;padding:3px 8px;border-radius:4px;}
+
+  /* 遠景：キャンバスあり */
+  .canvas-wrap{position:relative;width:100%;background:#000;}
+  canvas{width:100%;display:block;touch-action:none;}
+  canvas.mode-draw{cursor:crosshair;}
+  canvas.mode-move{cursor:grab;}
+  canvas.mode-move.grabbing{cursor:grabbing;}
+
+  .canvas-toolbar{display:flex;gap:8px;padding:10px 12px;background:var(--surface);border-top:1px solid var(--border);flex-wrap:wrap;align-items:center;}
+  .mode-btns{display:flex;gap:6px;}
+  .mode-btn{padding:7px 12px;border-radius:7px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .15s;}
+  .mode-btn.active{background:var(--accent);color:white;border-color:var(--accent);}
+  .size-wrap{display:flex;align-items:center;gap:8px;flex:1;min-width:110px;}
+  .size-wrap label{font-size:11px;color:var(--text2);white-space:nowrap;}
+  input[type="range"]{flex:1;accent-color:var(--accent);}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 12px;border-radius:7px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:none;white-space:nowrap;transition:opacity .15s,transform .1s;}
+  .btn:active{opacity:.8;transform:scale(.97);}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+  .btn-danger{background:rgba(232,93,58,.15);color:var(--accent);border:1px solid rgba(232,93,58,.3);}
+
+  .empty-state{text-align:center;padding:20px;color:var(--text2);font-size:14px;}
+  .count-badge{background:var(--accent);color:white;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-left:4px;}
+
+  .fab{position:fixed;bottom:20px;right:16px;background:var(--accent);color:white;border:none;border-radius:50px;padding:14px 22px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(232,93,58,.5);z-index:200;}
+  .fab:active{transform:scale(.95);}
+
+  .progress-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
+  .progress-overlay.show{display:flex;}
+  .progress-overlay p{font-size:16px;color:white;}
+  .spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,.2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:50px;font-size:14px;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;white-space:nowrap;z-index:250;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .popup-overlay{display:none;position:fixed;inset:0;z-index:490;}
+  .popup-overlay.show{display:block;}
+  .num-popup{display:none;position:fixed;z-index:500;background:var(--surface);border:2px solid var(--accent2);border-radius:10px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,.7);width:220px;}
+  .num-popup.open{display:block;}
+  .num-popup p{font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.5;}
+  .num-popup input[type="number"]{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:20px;font-family:inherit;padding:8px;outline:none;text-align:center;-webkit-appearance:none;}
+  .num-popup input[type="number"]:focus{border-color:var(--accent2);}
+  .num-popup-btns{display:flex;gap:6px;margin-top:10px;}
+  .num-popup-btns button{flex:1;padding:9px;border-radius:6px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;border:none;}
+  .btn-ok{background:var(--accent2);color:#1a1000;}
+  .btn-cancel-sm{background:var(--surface2);color:var(--text);border:1px solid var(--border)!important;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">📷</div>
+  <div><h1>現場写真集作成ツール</h1><span>赤丸描き込み・PDF出力対応</span></div>
+</header>
+
+<main>
+  <div class="section">
+    <div class="section-title">現場情報</div>
+    <input type="text" id="fieldName" placeholder="現場名・地番（例：大阪府堺市北区東浅香山町1丁目23番）">
+    <div class="point-row">
+      <label>点番号</label>
+      <input type="text" id="startPoint" placeholder="例：33" style="max-width:120px;">
+    </div>
+    <div class="hint">
+      奇数枚目 → 点番号（近景）赤丸なし<br>
+      偶数枚目 → 点番号（遠景）赤丸あり
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">写真 <span class="count-badge" id="photoCount">0</span></div>
+    <div class="upload-area" id="uploadArea">
+      <div class="icon">🖼️</div>
+      <p><strong>タップして写真を選択</strong></p>
+      <p>番号をタップしてPDF順を変更</p>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" multiple>
+    <div class="photo-list" id="photoList"><div class="empty-state">写真を追加してください</div></div>
+  </div>
+</main>
+
+<button class="fab" onclick="generatePDF()">📄 PDF出力</button>
+
+<div class="popup-overlay" id="popupOverlay" onclick="closeNumPopup()"></div>
+<div class="num-popup" id="numPopup">
+  <p id="numPopupLabel">PDF上の順番を入力</p>
+  <input type="number" id="numPopupInput" min="1" value="1">
+  <div class="num-popup-btns">
+    <button class="btn-cancel-sm" onclick="closeNumPopup()">キャンセル</button>
+    <button class="btn-ok" onclick="applyNumMove()">決定</button>
+  </div>
+</div>
+
+<div class="progress-overlay" id="progressOverlay"><div class="spinner"></div><p id="progressText">PDF生成中...</p></div>
+<div class="toast" id="toast"></div>
+
+<script>
+let photos   = [];
+let pdfOrder = [];
+const canvasState = {};
+let popupTargetId = null;
+
+// ======== PDF順インデックスから近景/遠景を判定 ========
+// pdfIdx(0始まり) 偶数=近景、奇数=遠景
+function isKinkei(pdfIdx) { return pdfIdx % 2 === 0; }
+
+function autoCaption(pdfIdx) {
+  const sp = document.getElementById('startPoint').value.trim();
+  const label = isKinkei(pdfIdx) ? '（近景）' : '（遠景）';
+  return sp ? `${sp}　${label}` : label;
+}
+
+document.getElementById('startPoint').addEventListener('input', () => {
+  pdfOrder.forEach((id, pdfIdx) => {
+    const cb = document.getElementById('capbadge_' + id);
+    if (cb) cb.textContent = autoCaption(pdfIdx);
+  });
+});
+
+// ======== アップロード ========
+document.getElementById('uploadArea').addEventListener('click', () => document.getElementById('fileInput').click());
+document.getElementById('fileInput').addEventListener('change', e => { handleFiles(e.target.files); e.target.value = ''; });
+
+function handleFiles(files) {
+  const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
+  if (!arr.length) return;
+  let loaded = 0;
+  const buf = new Array(arr.length);
+  arr.forEach((file, i) => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      buf[i] = { id: 'p' + Date.now() + '_' + i, src: ev.target.result, circles: [] };
+      if (++loaded === arr.length) {
+        photos   = photos.concat(buf);
+        pdfOrder = photos.map(p => p.id);
+        renderAll();
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ======== レンダリング ========
+function renderAll() {
+  const list = document.getElementById('photoList');
+  document.getElementById('photoCount').textContent = photos.length;
+  if (!photos.length) { list.innerHTML = '<div class="empty-state">写真を追加してください</div>'; return; }
+  list.innerHTML = '';
+
+  photos.forEach(p => {
+    const pdfIdx  = pdfOrder.indexOf(p.id);
+    const dispNum = pdfIdx >= 0 ? pdfIdx + 1 : '?';
+    const cap     = autoCaption(pdfIdx >= 0 ? pdfIdx : 0);
+    const kinkei  = isKinkei(pdfIdx >= 0 ? pdfIdx : 0);
+    const typeClass = kinkei ? 'kinkei' : 'enkei';
+
+    const card = document.createElement('div');
+    card.className = `photo-card ${typeClass}`;
+    card.dataset.id = p.id;
+
+    // 近景：プレビューのみ
+    const mediaHtml = kinkei
+      ? `<div class="preview-wrap">
+           <img class="preview-img" src="${p.src}" alt="近景">
+           <div class="no-annotation-label">近景（赤丸なし）</div>
+         </div>`
+      : `<div class="canvas-wrap" id="wrap_${p.id}">
+           <canvas id="canvas_${p.id}" class="mode-draw"></canvas>
+           <div class="canvas-toolbar">
+             <div class="mode-btns">
+               <button class="mode-btn active" id="btn_draw_${p.id}" onclick="setMode('${p.id}','draw')">✏️ 描く</button>
+               <button class="mode-btn" id="btn_move_${p.id}" onclick="setMode('${p.id}','move')">✋ 移動</button>
+             </div>
+             <div class="size-wrap">
+               <label>サイズ</label>
+               <input type="range" id="size_${p.id}" min="6" max="120" value="16">
+             </div>
+             <button class="btn btn-secondary" onclick="undoCircle('${p.id}')">↩</button>
+             <button class="btn btn-danger" onclick="clearCircles('${p.id}')">🗑</button>
+           </div>
+         </div>`;
+
+    card.innerHTML = `
+      <div class="card-header">
+        <div class="photo-num-wrap">
+          <div class="photo-num" id="numbadge_${p.id}" onclick="openNumPopup('${p.id}', this)">${dispNum}</div>
+        </div>
+        <span class="caption-badge ${typeClass}" id="capbadge_${p.id}">${cap}</span>
+        <input class="photo-caption" type="text" placeholder="追加メモ（任意）" id="memo_${p.id}">
+        <button class="photo-delete" onclick="deletePhoto('${p.id}')">🗑</button>
+      </div>
+      ${mediaHtml}`;
+
+    list.appendChild(card);
+
+    // 遠景のみキャンバス初期化
+    if (!kinkei) setTimeout(() => initCanvas(p.id), 40);
+  });
+}
+
+function deletePhoto(id) {
+  photos   = photos.filter(x => x.id !== id);
+  pdfOrder = pdfOrder.filter(x => x !== id);
+  delete canvasState[id];
+  if (popupTargetId === id) closeNumPopup();
+  renderAll();
+}
+
+// ======== ポップアップ ========
+function openNumPopup(id, badgeEl) {
+  closeNumPopup();
+  popupTargetId = id;
+  const pdfIdx = pdfOrder.indexOf(id);
+  const total  = pdfOrder.length;
+  document.getElementById('numPopupLabel').textContent = `PDF順を入力（1〜${total}）`;
+  const inp = document.getElementById('numPopupInput');
+  inp.max   = total;
+  inp.value = pdfIdx >= 0 ? pdfIdx + 1 : 1;
+
+  const popup   = document.getElementById('numPopup');
+  const overlay = document.getElementById('popupOverlay');
+  const rect    = badgeEl.getBoundingClientRect();
+  let top  = rect.bottom + 6 + window.scrollY;
+  let left = rect.left;
+  if (left + 220 > window.innerWidth - 8) left = window.innerWidth - 228;
+  if (left < 8) left = 8;
+  popup.style.top  = top + 'px';
+  popup.style.left = left + 'px';
+  popup.classList.add('open');
+  overlay.classList.add('show');
+  setTimeout(() => inp.select(), 60);
+}
+
+function closeNumPopup() {
+  document.getElementById('numPopup').classList.remove('open');
+  document.getElementById('popupOverlay').classList.remove('show');
+  popupTargetId = null;
+}
+
+function applyNumMove() {
+  if (!popupTargetId) return;
+  const id   = popupTargetId;
+  const inp  = document.getElementById('numPopupInput');
+  let to     = parseInt(inp.value) - 1;
+  const from = pdfOrder.indexOf(id);
+  if (isNaN(to) || to < 0) to = 0;
+  if (to >= pdfOrder.length) to = pdfOrder.length - 1;
+  if (from >= 0 && from !== to) {
+    const [moved] = pdfOrder.splice(from, 1);
+    pdfOrder.splice(to, 0, moved);
+  }
+  closeNumPopup();
+
+  // バッジのみ更新（画面全体リロードなし）
+  pdfOrder.forEach((pid, pdfIdx) => {
+    const nb = document.getElementById('numbadge_' + pid);
+    const cb = document.getElementById('capbadge_' + pid);
+    const kinkei = isKinkei(pdfIdx);
+    if (nb) nb.textContent = pdfIdx + 1;
+    if (cb) {
+      cb.textContent = autoCaption(pdfIdx);
+      cb.className   = `caption-badge ${kinkei ? 'kinkei' : 'enkei'}`;
+    }
+    // カードの色クラスも更新
+    const card = document.querySelector(`.photo-card[data-id="${pid}"]`);
+    if (card) {
+      card.classList.remove('kinkei', 'enkei');
+      card.classList.add(kinkei ? 'kinkei' : 'enkei');
+    }
+  });
+
+  showToast(`PDF順を ${from + 1} → ${to + 1} に変更しました`);
+}
+
+// ======== モード切替 ========
+function setMode(id, mode) {
+  const s = canvasState[id]; if (!s) return;
+  s.mode = mode;
+  const canvas = document.getElementById('canvas_' + id);
+  canvas.className = mode === 'move' ? 'mode-move' : 'mode-draw';
+  document.getElementById('btn_draw_' + id).classList.toggle('active', mode === 'draw');
+  document.getElementById('btn_move_' + id).classList.toggle('active', mode === 'move');
+}
+
+// ======== キャンバス（遠景のみ）========
+function initCanvas(id) {
+  const canvas = document.getElementById('canvas_' + id);
+  const wrap   = document.getElementById('wrap_' + id);
+  if (!canvas || !wrap) return;
+  const p = photos.find(x => x.id === id);
+  if (!p) return;
+  const img = new Image();
+  img.onload = () => {
+    const W = img.width, H = img.height;
+    canvas.width = W; canvas.height = H;
+    const dW = wrap.offsetWidth || (window.innerWidth - 28);
+    canvas.style.width  = dW + 'px';
+    canvas.style.height = Math.round(dW * H / W) + 'px';
+    const ctx = canvas.getContext('2d');
+    canvasState[id] = { img, ctx, W, H, mode: 'draw', drawing: false, sx: 0, sy: 0, dragIdx: -1, dragOffX: 0, dragOffY: 0 };
+    redrawCanvas(id);
+    canvas.addEventListener('mousedown',  e => onStart(e, id, canvas));
+    canvas.addEventListener('mousemove',  e => onMove(e, id, canvas));
+    canvas.addEventListener('mouseup',    e => onEnd(e, id, canvas));
+    canvas.addEventListener('mouseleave', e => onEnd(e, id, canvas));
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); onStart(e.touches[0], id, canvas); }, { passive: false });
+    canvas.addEventListener('touchmove',  e => { e.preventDefault(); onMove(e.touches[0], id, canvas); }, { passive: false });
+    canvas.addEventListener('touchend',   e => { e.preventDefault(); onEnd(e.changedTouches[0], id, canvas); }, { passive: false });
+  };
+  img.src = p.src;
+}
+
+function gp(e, canvas) {
+  const r = canvas.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (canvas.width / r.width), y: (e.clientY - r.top) * (canvas.height / r.height) };
+}
+function onStart(e, id, canvas) {
+  const s = canvasState[id]; if (!s) return;
+  const pt = gp(e, canvas);
+  if (s.mode === 'draw') { s.drawing = true; s.sx = pt.x; s.sy = pt.y; }
+  else {
+    const ph = photos.find(x => x.id === id);
+    let minD = Infinity, minI = -1;
+    (ph.circles || []).forEach((c, i) => {
+      const d = Math.hypot(pt.x - c.cx, pt.y - c.cy);
+      if (d < c.r * 1.5 && d < minD) { minD = d; minI = i; }
+    });
+    s.dragIdx = minI;
+    if (minI >= 0) { s.dragOffX = pt.x - ph.circles[minI].cx; s.dragOffY = pt.y - ph.circles[minI].cy; canvas.classList.add('grabbing'); }
+  }
+}
+function onMove(e, id, canvas) {
+  const s = canvasState[id]; if (!s) return;
+  const pt = gp(e, canvas);
+  if (s.mode === 'draw' && s.drawing) {
+    redrawCanvas(id);
+    drawCircle(s.ctx, (pt.x + s.sx) / 2, (pt.y + s.sy) / 2, Math.max(Math.abs(pt.x - s.sx), Math.abs(pt.y - s.sy)) / 2, true);
+  } else if (s.mode === 'move' && s.dragIdx >= 0) {
+    const ph = photos.find(x => x.id === id);
+    ph.circles[s.dragIdx].cx = pt.x - s.dragOffX;
+    ph.circles[s.dragIdx].cy = pt.y - s.dragOffY;
+    redrawCanvas(id);
+  }
+}
+function onEnd(e, id, canvas) {
+  const s = canvasState[id]; if (!s) return;
+  const pt = gp(e, canvas);
+  if (s.mode === 'draw' && s.drawing) {
+    s.drawing = false;
+    const ph = photos.find(x => x.id === id);
+    const dx = Math.abs(pt.x - s.sx), dy = Math.abs(pt.y - s.sy);
+    if (dx < 6 && dy < 6) {
+      const r = parseInt(document.getElementById('size_' + id).value) * (s.W / canvas.offsetWidth);
+      ph.circles.push({ cx: s.sx, cy: s.sy, r });
+    } else {
+      ph.circles.push({ cx: (pt.x + s.sx) / 2, cy: (pt.y + s.sy) / 2, r: Math.max(dx, dy) / 2 });
+    }
+    redrawCanvas(id);
+  } else if (s.mode === 'move') { s.dragIdx = -1; canvas.classList.remove('grabbing'); }
+}
+
+function drawCircle(ctx, cx, cy, r, preview = false) {
+  if (r < 3) return;
+  ctx.save();
+  ctx.strokeStyle = '#ff1111'; ctx.lineWidth = Math.max(r * 0.13, 5);
+  ctx.shadowColor = 'rgba(255,0,0,0.35)'; ctx.shadowBlur = 10;
+  if (preview) ctx.globalAlpha = 0.55;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+}
+function redrawCanvas(id) {
+  const s = canvasState[id]; if (!s) return;
+  const p = photos.find(x => x.id === id);
+  s.ctx.clearRect(0, 0, s.W, s.H); s.ctx.drawImage(s.img, 0, 0);
+  (p.circles || []).forEach(c => drawCircle(s.ctx, c.cx, c.cy, c.r));
+}
+function undoCircle(id) { const p = photos.find(x => x.id === id); if (p && p.circles.length) { p.circles.pop(); redrawCanvas(id); } }
+function clearCircles(id) { const p = photos.find(x => x.id === id); if (p) { p.circles = []; redrawCanvas(id); } }
+
+// ======== PDF生成 ========
+async function generatePDF() {
+  if (!photos.length) { showToast('写真を追加してください'); return; }
+  document.getElementById('progressOverlay').classList.add('show');
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const PW = 210, PH = 297, ML = 10, MR = 10, MT = 12, MB = 10, CW = PW - ML - MR;
+    const fieldName = document.getElementById('fieldName').value || '現場写真集';
+    const ordered   = pdfOrder.map(id => photos.find(p => p.id === id)).filter(Boolean);
+
+    const headerH = 14, capH = 12, gapH = 4;
+    const slotH   = (PH - MT - MB - headerH - gapH) / 2;
+    const imgH    = slotH - capH;
+
+    for (let i = 0; i < ordered.length; i++) {
+      const p = ordered[i];
+      document.getElementById('progressText').textContent = `PDF生成中... (${i + 1}/${ordered.length})`;
+
+      if (i % 2 === 0) {
+        if (i > 0) doc.addPage();
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(20); doc.setTextColor(0, 0, 0);
+        doc.text(fieldName, ML, MT + 9);
+        doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3);
+        doc.line(ML, MT + headerH, PW - MR, MT + headerH);
+      }
+
+      const slot = i % 2;
+      const yTop = MT + headerH + slot * (slotH + gapH);
+      const yImg = yTop + capH;
+
+      // キャプション
+      const cap      = autoCaption(i);
+      const memo     = (document.getElementById('memo_' + p.id)?.value || '').trim();
+      const capText  = memo ? `${cap}　${memo}` : cap;
+      doc.setFontSize(20); doc.setTextColor(0, 0, 0);
+      doc.text(capText, ML, yTop + 8);
+
+      // 写真枠
+      doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3);
+      doc.rect(ML, yImg, CW, imgH);
+
+      // 写真取得（近景はそのまま・遠景は赤丸込み）
+      const src = await getPhotoSrc(p, isKinkei(i));
+      const pr  = doc.getImageProperties(src);
+      const asp = pr.width / pr.height;
+      let dW = CW, dH = dW / asp;
+      if (dH > imgH) { dH = imgH; dW = dH * asp; }
+      doc.addImage(src, 'JPEG', ML + (CW - dW) / 2, yImg + (imgH - dH) / 2, dW, dH);
+    }
+
+    doc.save(`現場写真集_${fieldName.slice(0, 20)}.pdf`);
+    showToast('PDFを保存しました！');
+  } catch (err) { console.error(err); showToast('エラーが発生しました'); }
+  finally { document.getElementById('progressOverlay').classList.remove('show'); }
+}
+
+async function getPhotoSrc(p, kinkei) {
+  // 近景：赤丸なしでそのまま返す
+  if (kinkei) return p.src;
+  // 遠景：赤丸を合成
+  if (!p.circles || !p.circles.length) return p.src;
+  const canvas = document.getElementById('canvas_' + p.id);
+  if (canvas && canvasState[p.id]) return canvas.toDataURL('image/jpeg', 0.95);
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      const oc = document.createElement('canvas');
+      oc.width = img.width; oc.height = img.height;
+      const ctx = oc.getContext('2d'); ctx.drawImage(img, 0, 0);
+      (p.circles || []).forEach(c => drawCircle(ctx, c.cx, c.cy, c.r));
+      res(oc.toDataURL('image/jpeg', 0.95));
+    };
+    img.src = p.src;
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
