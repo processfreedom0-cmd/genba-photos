@@ -165,7 +165,9 @@ document.getElementById('startPoint').addEventListener('input', () => {
 function isKinkei(pdfIdx) { return pdfIdx % 2 === 0; }
 
 function autoCaption(pdfIdx) {
-  const sp    = document.getElementById('startPoint').value.trim();
+  // startPoint欄から取得（sessionStorageもフォールバックとして参照）
+  const el = document.getElementById('startPoint');
+  const sp = (el ? el.value.trim() : '') || sessionStorage.getItem('startPoint') || '';
   const label = isKinkei(pdfIdx) ? '（近景）' : '（遠景）';
   return sp ? `${sp}　${label}` : label;
 }
@@ -449,7 +451,10 @@ async function generatePDF() {
       const yTop = MT + headerH + slot * (slotH + gapH);
       const yImg = yTop + capH;
 
-      const cap     = autoCaption(i);
+      // キャプション生成（点番号 + 近景/遠景）
+      const sp      = document.getElementById('startPoint').value.trim();
+      const label   = isKinkei(i) ? '（近景）' : '（遠景）';
+      const cap     = sp ? `${sp}　${label}` : label;
       const memo    = (document.getElementById('memo_' + p.id)?.value || '').trim();
       const capText = memo ? `${cap}　${memo}` : cap;
       doc.setFontSize(20); doc.setTextColor(0, 0, 0);
@@ -466,8 +471,21 @@ async function generatePDF() {
       doc.addImage(src, 'JPEG', ML + (CW - dW) / 2, yImg + (imgH - dH) / 2, dW, dH);
     }
 
-    doc.save(`現場写真集_${fieldName.slice(0, 20)}.pdf`);
-    showToast('PDFを保存しました！');
+    // PDFをBlobに変換してダウンロードリンク生成
+    const pdfBlob = doc.output('blob');
+    const url = URL.createObjectURL(pdfBlob);
+    const fname = `現場写真集_${fieldName.slice(0,20)}.pdf`;
+
+    // ダウンロードリンクをクリック（ブラウザの保存先ダイアログが開く）
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+
+    showToast('PDFを保存しました！Dropboxフォルダを保存先に指定できます');
   } catch (err) { console.error(err); showToast('エラーが発生しました: ' + err.message); }
   finally { document.getElementById('progressOverlay').classList.remove('show'); }
 }
