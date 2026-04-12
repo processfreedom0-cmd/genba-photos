@@ -77,7 +77,6 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 .fab{color:white;border:none;border-radius:50px;padding:13px 20px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:7px;box-shadow:0 4px 16px rgba(0,0,0,.4);}
 .fab:active{transform:scale(.95);}
 .fab-pdf{background:var(--accent);}
-.fab-drop{background:#0061FF;}
 /* progress */
 .progress-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
 .progress-overlay.show{display:flex;}
@@ -127,7 +126,6 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 
 <!-- FABボタン -->
 <div class="fab-area">
-  <button class="fab fab-drop" onclick="saveToDropbox()">💧 Dropboxに保存</button>
   <button class="fab fab-pdf" onclick="generatePDF(false)">📄 PDF出力</button>
 </div>
 
@@ -512,41 +510,6 @@ async function generatePDF() {
   finally{document.getElementById('progressOverlay').classList.remove('show');}
 }
 
-// Dropboxへ保存（Dropbox Chooser/Saver API）
-async function saveToDropbox(){
-  if(!photos.length){showToast('写真を追加してください');return;}
-  document.getElementById('progressOverlay').classList.add('show');
-  document.getElementById('progressText').textContent='PDF生成中...';
-  try{
-    const doc = await buildPDF();
-    const fieldName = document.getElementById('fieldName').value.trim() || '現場写真集';
-    const fname = `現場写真集_${fieldName.slice(0,20)}.pdf`;
-    const blob  = doc.output('blob');
-
-    // Dropbox Saver APIが利用可能か確認
-    if(typeof Dropbox !== 'undefined' && Dropbox.isBrowserSupported()){
-      const url = URL.createObjectURL(blob);
-      Dropbox.save(url, fname, {
-        success: () => { showToast('Dropboxに保存しました！'); URL.revokeObjectURL(url); },
-        cancel:  () => { showToast('キャンセルしました'); URL.revokeObjectURL(url); },
-        error:   (e) => { showToast('Dropboxエラー: '+e); URL.revokeObjectURL(url); }
-      });
-    } else {
-      // Dropbox APIが使えない場合はダウンロードダイアログを開く
-      const url = URL.createObjectURL(blob);
-      const a   = document.createElement('a');
-      a.href     = url;
-      a.download = fname;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(()=>URL.revokeObjectURL(url), 3000);
-      showToast('📂 保存先でDropboxフォルダを選択してください');
-    }
-  }catch(err){console.error(err);showToast('エラー: '+err.message);}
-  finally{document.getElementById('progressOverlay').classList.remove('show');}
-}
-
 async function getPhotoSrc(p,kinkei){
   if(kinkei) return p.src;
   if(!p.circles||!p.circles.length) return p.src;
@@ -570,7 +533,5 @@ function showToast(msg){
   setTimeout(()=>t.classList.remove('show'),3000);
 }
 </script>
-<!-- Dropbox JS SDK（Saverボタン用）-->
-<script src="https://www.dropbox.com/static/api/2/dropins.js" id="dropboxjs" data-app-key="placeholder"></script>
 </body>
 </html>
