@@ -191,7 +191,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
   <div class="section">
     <div class="section-title">現場情報</div>
     <input type="text" id="fieldName" placeholder="現場名（例：テスト）">
-    <div class="hint" style="margin-top:8px;">📌 奇数枚目（近景）に点番号を入力 → 偶数枚目（遠景）に自動反映</div>
+    <div class="hint" style="margin-top:8px;">📌 奇数枚目（近景）に点番号を入力 → 偶数枚目（遠景）に自動反映。編集内容は自動保存されます。<button onclick="if(confirm('保存データを消去しますか？')){gClearSaved();photos=[];pdfOrder=[];renderAll();document.getElementById('fieldName').value='';showToast('リセットしました');}" style="margin-left:8px;font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-family:inherit;">🗑 保存データ消去</button></div>
   </div>
   <div class="section">
     <div class="section-title">写真 <span class="count-badge" id="photoCount">0</span></div>
@@ -205,6 +205,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
   </div>
 </main>
 <div class="fab-area">
+  <button class="fab" style="background:#2a7a4a;font-size:20px;padding:10px;width:46px;height:46px;border-radius:50%;justify-content:center;" title="今すぐ保存" onclick="gAutosave().then(()=>showToast('保存しました'))">💾</button>
   <button class="fab fab-pdf-genba" onclick="generatePDF()">📄 PDF出力（現場）</button>
 </div>
 </div>
@@ -233,7 +234,6 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 </main>
 <div class="fab-area">
   <button class="fab" style="background:#2a7a4a;font-size:20px;padding:10px;width:46px;height:46px;border-radius:50%;justify-content:center;" title="今すぐ保存" onclick="sAutosave().then(()=>showToast('保存しました'))">💾</button>
-  <button class="fab" style="background:#5a3a6a;font-size:13px;padding:10px 16px;" onclick="if(confirm('写真を全て消去して新しい写真集を作成しますか？')){sClearSaved();sPhotos=[];sIdCnt=0;document.getElementById(\'s-bukken\').value=\'\';sRenderAll();showToast(\'リセットしました\');}">🔄</button>
   <button class="fab fab-pdf-sokuryou" onclick="sGeneratePDF()">📄 PDF出力（測量）</button>
 </div>
 </div>
@@ -351,6 +351,46 @@ async function idbClear() {
       tx.onerror    = e => rej(e);
     });
   } catch(e){ console.warn('IDB clear error:',e); }
+}
+
+
+// =========================================================
+//  杭打ち：IndexedDB 自動保存・復元
+// =========================================================
+async function gAutosave() {
+  if(!photos.length) return;
+  try {
+    const meta = photos.map(p=>({id:p.id, circles:p.circles, pointNum:p.pointNum||''}));
+    await idbSave('g_meta', JSON.stringify(meta));
+    await idbSave('g_fieldName', document.getElementById('fieldName').value||'');
+    await idbSave('g_pdfOrder', JSON.stringify(pdfOrder));
+    for(const p of photos){ await idbSave('g_img_'+p.id, p.src); }
+    await idbSave('g_ids', JSON.stringify(photos.map(p=>p.id)));
+  } catch(e){ console.warn('genba autosave error:',e); }
+}
+async function gRestore() {
+  try {
+    const ids = await idbLoad('g_ids');
+    if(!ids) return;
+    const idArr = JSON.parse(ids); if(!idArr.length) return;
+    const metaStr = await idbLoad('g_meta'); if(!metaStr) return;
+    const meta = JSON.parse(metaStr);
+    const fieldName = await idbLoad('g_fieldName');
+    if(fieldName) document.getElementById('fieldName').value=fieldName;
+    const orderStr = await idbLoad('g_pdfOrder');
+    const restored = [];
+    for(const m of meta){ const src=await idbLoad('g_img_'+m.id); if(src) restored.push({...m,src}); }
+    if(!restored.length) return;
+    photos=restored; pdfOrder=orderStr?JSON.parse(orderStr):photos.map(p=>p.id);
+    renderAll(); showToast('前回のデータを復元しました（'+restored.length+'枚）');
+  } catch(e){ console.warn('genba restore error:',e); }
+}
+async function gClearSaved() {
+  try {
+    const ids=await idbLoad('g_ids');
+    if(ids){ for(const id of JSON.parse(ids)) await idbSave('g_img_'+id,null); }
+    for(const k of ['g_ids','g_meta','g_fieldName','g_pdfOrder']) await idbSave(k,null);
+  } catch(e){ console.warn('genba clear error:',e); }
 }
 
 // 測量データをIndexedDBに保存（写真srcは別キーで保存）
@@ -624,6 +664,8 @@ function saveField(){sessionStorage.setItem('fieldName',document.getElementById(
 function restoreField(){const fn=sessionStorage.getItem('fieldName');if(fn)document.getElementById('fieldName').value=fn;}
 document.addEventListener('DOMContentLoaded',()=>{
   restoreField();
+  // 現場データをIndexedDBから復元
+  gRestore();
   // 測量データをIndexedDBから復元
   sRestore();
   // DnD初期化（現場）
@@ -643,7 +685,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     true
   );
 });
-document.getElementById('fieldName').addEventListener('input', saveField);
+document.getElementById('fieldName').addEventListener('input', ()=>{saveField();clearTimeout(window._gAutoSaveTimer);window._gAutoSaveTimer=setTimeout(gAutosave,1500);});
 
 function isKinkei(pdfIdx){return pdfIdx%2===0;}
 
@@ -659,7 +701,7 @@ function handleFiles(files){
       // 長辺1920pxにリサイズしてメモリ削減
       const resized=await resizeImage(ev.target.result,1280);
       buf[i]={id:'p'+Date.now()+'_'+i,src:resized,circles:[],pointNum:''};
-      if(++loaded===arr.length){photos=photos.concat(buf);pdfOrder=photos.map(p=>p.id);renderAll();}
+      if(++loaded===arr.length){photos=photos.concat(buf);pdfOrder=photos.map(p=>p.id);renderAll();clearTimeout(window._gAutoSaveTimer);window._gAutoSaveTimer=setTimeout(gAutosave,1000);}
     };reader.readAsDataURL(file);
   });
 }
@@ -734,6 +776,7 @@ function onPointInput(id,val){
 function deletePhoto(id){
   photos=photos.filter(x=>x.id!==id);pdfOrder=pdfOrder.filter(x=>x!==id);
   delete canvasState[id];if(popupTargetId===id)closeNumPopup();renderAll();
+  clearTimeout(window._gAutoSaveTimer);window._gAutoSaveTimer=setTimeout(gAutosave,1000);
 }
 function replacePhotoClick(id){const el=document.getElementById("repl_"+id);if(el)el.click();}
 function replacePhoto(id,input){
