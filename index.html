@@ -3,58 +3,89 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>現場写真集作成ツール</title>
+<title>写真集作成ツール</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-:root{--bg:#0f1923;--surface:#1a2535;--surface2:#243044;--accent:#e85d3a;--accent2:#f5a623;--text:#e8edf2;--text2:#8899aa;--border:#2d3f55;--radius:12px;}
+:root{--bg:#0f1923;--surface:#1a2535;--surface2:#243044;--accent:#e85d3a;--accent2:#f5a623;--accent3:#4a9eff;--text:#e8edf2;--text2:#8899aa;--border:#2d3f55;--radius:12px;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{background:var(--bg);color:var(--text);font-family:'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;min-height:100vh;padding-bottom:100px;}
-header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;}
-header .logo{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;}
-header h1{font-size:16px;font-weight:700;}
-header span{font-size:11px;color:var(--text2);}
+
+/* ===== TABS ===== */
+.tab-header{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.tab-top{display:flex;align-items:center;gap:10px;padding:12px 16px 0;}
+.logo{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.app-title{font-size:15px;font-weight:700;}
+.tab-bar{display:flex;margin-top:10px;}
+.tab-btn{flex:1;padding:10px 8px;border:none;background:none;color:var(--text2);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;border-bottom:3px solid transparent;transition:all .2s;letter-spacing:.02em;}
+.tab-btn.active{color:var(--accent2);border-bottom-color:var(--accent2);}
+.tab-btn:first-child.active{color:var(--accent);border-bottom-color:var(--accent);}
+.panel{display:none;}
+.panel.active{display:block;}
+
 main{padding:14px;max-width:640px;margin:0 auto;}
 .section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px;}
 .section-title{font-size:11px;font-weight:700;color:var(--accent2);letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
 .section-title::before{content:'';display:block;width:3px;height:13px;background:var(--accent2);border-radius:2px;}
+.section-title.blue{color:var(--accent3);}
+.section-title.blue::before{background:var(--accent3);}
 input[type="text"]{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:15px;font-family:inherit;padding:11px 13px;outline:none;transition:border-color .2s;}
 input[type="text"]:focus{border-color:var(--accent2);}
 input[type="text"]::placeholder{color:var(--text2);}
-.row{display:flex;gap:8px;align-items:center;margin-top:10px;}
-.row label{font-size:12px;color:var(--text2);white-space:nowrap;flex-shrink:0;}
 .hint{font-size:11px;color:var(--text2);margin-top:6px;line-height:1.6;}
 .upload-area{border:2px dashed var(--border);border-radius:var(--radius);padding:24px 16px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;}
 .upload-area:hover{border-color:var(--accent2);background:rgba(245,166,35,.05);}
+.upload-area.blue:hover{border-color:var(--accent3);background:rgba(74,158,255,.05);}
 .upload-area .icon{font-size:32px;margin-bottom:6px;}
 .upload-area p{font-size:14px;color:var(--text2);}
 .upload-area strong{color:var(--accent2);}
-#fileInput{display:none;}
+.upload-area.blue strong{color:var(--accent3);}
+.file-input-hidden{display:none;}
 .photo-list{display:flex;flex-direction:column;gap:14px;margin-top:12px;}
-.photo-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+
+/* ===== DRAG & DROP ===== */
+.photo-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:opacity .2s, box-shadow .2s, transform .15s;}
 .photo-card.kinkei{border-left:4px solid var(--accent2);}
 .photo-card.enkei{border-left:4px solid var(--accent);}
-/* カードヘッダー */
-.card-header{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);}
+.photo-card.sokuryou-card{border-left:4px solid var(--accent3);}
+
+/* ドラッグ中のカード */
+.photo-card.dragging{opacity:0.35;box-shadow:none;transform:scale(0.98);}
+
+/* ドロップ位置インジケーター */
+.drop-indicator{height:4px;border-radius:2px;background:var(--accent2);margin:2px 0;transition:opacity .15s;opacity:0;pointer-events:none;}
+.drop-indicator.sokuryou{background:var(--accent3);}
+.drop-indicator.visible{opacity:1;}
+
+/* ドラッグハンドル */
+.drag-handle{display:flex;align-items:center;justify-content:center;width:28px;height:28px;cursor:grab;color:var(--text2);flex-shrink:0;border-radius:6px;transition:background .15s, color .15s;touch-action:none;user-select:none;}
+.drag-handle:hover{background:rgba(255,255,255,.07);color:var(--text);}
+.drag-handle:active{cursor:grabbing;}
+.drag-handle-icon{font-size:16px;line-height:1;pointer-events:none;}
+
+/* ドラッグ中のゴースト（タッチ用） */
+.drag-ghost{position:fixed;pointer-events:none;z-index:9999;border-radius:var(--radius);box-shadow:0 12px 40px rgba(0,0,0,.6);opacity:0.85;overflow:hidden;border:2px solid var(--accent2);}
+.drag-ghost.sokuryou{border-color:var(--accent3);}
+
+.card-header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);}
 .photo-num{background:var(--accent);color:white;border-radius:6px;width:30px;height:30px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .photo-num.kinkei{background:var(--accent2);color:#1a1000;}
-.caption-badge{font-size:12px;font-weight:700;color:var(--text2);flex-shrink:0;}
-.caption-badge.enkei{color:var(--accent);}
-/* 点番号入力（近景のみ表示）*/
+.photo-num.enkei{background:var(--accent);color:white;}
+.photo-num.sokuryou{background:var(--accent3);color:white;}
 .point-input-wrap{flex:1;display:flex;align-items:center;gap:6px;}
 .point-input-wrap label{font-size:11px;color:var(--text2);white-space:nowrap;}
 .point-input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;font-family:inherit;padding:6px 10px;outline:none;}
 .point-input:focus{border-color:var(--accent2);}
 .point-input::placeholder{color:var(--text2);}
 .photo-delete{background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:0 2px;flex-shrink:0;}
-/* 近景：プレビューのみ */
+.photo-replace{background:rgba(74,158,255,.15);border:1px solid rgba(74,158,255,.3);color:var(--accent3);border-radius:6px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;padding:4px 8px;flex-shrink:0;white-space:nowrap;}
+.photo-replace:hover{background:rgba(74,158,255,.3);}
 .preview-wrap{width:100%;background:#000;position:relative;}
 .preview-img{width:100%;display:block;object-fit:contain;}
 .no-anno-label{position:absolute;bottom:8px;right:10px;background:rgba(0,0,0,.55);color:rgba(255,255,255,.6);font-size:11px;padding:3px 8px;border-radius:4px;}
-/* 遠景：キャンバス */
 .canvas-wrap{position:relative;width:100%;background:#000;}
 canvas{width:100%;display:block;touch-action:none;}
 canvas.mode-draw{cursor:crosshair;}
@@ -72,11 +103,41 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 .btn-danger{background:rgba(232,93,58,.15);color:var(--accent);border:1px solid rgba(232,93,58,.3);}
 .empty-state{text-align:center;padding:20px;color:var(--text2);font-size:14px;}
 .count-badge{background:var(--accent);color:white;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-left:4px;}
-/* FABエリア */
+.count-badge.blue{background:var(--accent3);}
+
+/* ===== 測量：備考エリア ===== */
+.biko-row{display:flex;align-items:flex-start;gap:0;padding:0;background:#000;}
+.biko-canvas-col{flex:1;min-width:0;}
+.biko-right-col{width:90px;flex-shrink:0;background:var(--surface2);padding:10px 8px;display:flex;flex-direction:column;gap:4px;border-left:1px solid var(--border);}
+.biko-label{font-size:10px;color:var(--accent3);font-weight:700;letter-spacing:.05em;margin-bottom:4px;}
+.biko-textarea{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:inherit;padding:6px 7px;outline:none;resize:none;min-height:80px;line-height:1.5;}
+.biko-textarea:focus{border-color:var(--accent3);}
+.biko-textarea::placeholder{color:var(--text2);font-size:11px;}
+
+/* ===== 楕円選択・ハンドル編集 ===== */
+.eel-desel{font-size:12px;font-weight:700;padding:5px 10px;border-radius:6px;border:none;background:var(--surface2);color:var(--text2);cursor:pointer;font-family:inherit;position:absolute;top:6px;right:8px;z-index:10;}
+.eel-hint{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);color:#fff;font-size:10px;padding:3px 10px;border-radius:20px;pointer-events:none;white-space:nowrap;opacity:0.85;}
+
+
+/* ===== 測量：カテゴリー選択 ===== */
+.cat-row{padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.cat-select{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:inherit;padding:5px 8px;outline:none;cursor:pointer;flex-shrink:0;}
+.cat-select:focus{border-color:var(--accent3);}
+.cat-sub-input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:inherit;padding:5px 8px;outline:none;flex:1;min-width:80px;}
+.cat-sub-input:focus{border-color:var(--accent3);}
+.cat-sub-input::placeholder{color:var(--text2);}
+.cat-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:var(--accent3);color:#fff;margin-left:4px;flex-shrink:0;}
+
+/* ===== FAB ===== */
 .fab-area{position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-end;z-index:200;}
 .fab{color:white;border:none;border-radius:50px;padding:13px 20px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:7px;box-shadow:0 4px 16px rgba(0,0,0,.4);}
 .fab:active{transform:scale(.95);}
-.fab-pdf{background:var(--accent);}
+.fab-pdf-genba{background:var(--accent);}
+.fab-pdf-sokuryou{background:var(--accent3);}
+
+/* ===== ページ区切りヒント ===== */
+.page-hint{text-align:center;font-size:11px;color:var(--accent3);padding:6px 0;letter-spacing:.04em;border-top:1px dashed rgba(74,158,255,.3);margin-top:2px;opacity:.8;pointer-events:none;}
+
 /* progress */
 .progress-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
 .progress-overlay.show{display:flex;}
@@ -85,14 +146,14 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 @keyframes spin{to{transform:rotate(360deg);}}
 .toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:50px;font-size:14px;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;white-space:nowrap;z-index:250;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-/* PDF順変更ポップアップ */
+
+/* popup */
 .popup-overlay{display:none;position:fixed;inset:0;z-index:490;}
 .popup-overlay.show{display:block;}
 .num-popup{display:none;position:fixed;z-index:500;background:var(--surface);border:2px solid var(--accent2);border-radius:10px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,.7);width:220px;}
 .num-popup.open{display:block;}
 .num-popup p{font-size:12px;color:var(--text2);margin-bottom:8px;}
 .num-popup input[type="number"]{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:20px;font-family:inherit;padding:8px;outline:none;text-align:center;-webkit-appearance:none;}
-.num-popup input[type="number"]:focus{border-color:var(--accent2);}
 .num-popup-btns{display:flex;gap:6px;margin-top:10px;}
 .num-popup-btns button{flex:1;padding:9px;border-radius:6px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;border:none;}
 .btn-ok{background:var(--accent2);color:#1a1000;}
@@ -100,17 +161,26 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 </style>
 </head>
 <body>
-<header>
-  <div class="logo">📷</div>
-  <div><h1>現場写真集作成ツール</h1><span>赤丸描き込み・PDF出力対応</span></div>
-</header>
+
+<!-- TAB HEADER -->
+<div class="tab-header">
+  <div class="tab-top">
+    <div class="logo">📷</div>
+    <div class="app-title">写真集作成ツール</div>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-genba" onclick="switchTab('genba')">🏗️ 現場写真集（杭打ち）</button>
+    <button class="tab-btn" id="tab-sokuryou" onclick="switchTab('sokuryou')">🗾 測量写真集</button>
+  </div>
+</div>
+
+<!-- ===================== 現場（杭打ち）パネル ===================== -->
+<div id="panel-genba" class="panel active">
 <main>
   <div class="section">
     <div class="section-title">現場情報</div>
     <input type="text" id="fieldName" placeholder="現場名（例：テスト）">
-    <div class="hint" style="margin-top:8px;">
-      📌 奇数枚目（近景）に点番号を入力 → 偶数枚目（遠景）に自動反映
-    </div>
+    <div class="hint" style="margin-top:8px;">📌 奇数枚目（近景）に点番号を入力 → 偶数枚目（遠景）に自動反映</div>
   </div>
   <div class="section">
     <div class="section-title">写真 <span class="count-badge" id="photoCount">0</span></div>
@@ -119,17 +189,43 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
       <p><strong>タップして写真を選択</strong></p>
       <p>近景→遠景の順に追加してください</p>
     </div>
-    <input type="file" id="fileInput" accept="image/*" multiple>
+    <input type="file" id="fileInput" accept="image/*" multiple class="file-input-hidden">
     <div class="photo-list" id="photoList"><div class="empty-state">写真を追加してください</div></div>
   </div>
 </main>
-
-<!-- FABボタン -->
 <div class="fab-area">
-  <button class="fab fab-pdf" onclick="generatePDF(false)">📄 PDF出力</button>
+  <button class="fab fab-pdf-genba" onclick="generatePDF()">📄 PDF出力（現場）</button>
+</div>
 </div>
 
-<!-- ポップアップ -->
+<!-- ===================== 測量パネル ===================== -->
+<div id="panel-sokuryou" class="panel">
+<main>
+  <div class="section">
+    <div class="section-title blue">物件情報</div>
+    <input type="text" id="s-bukken" placeholder="例：大阪市淀川区加島一丁目351-4（加島158①LS）">
+    <div class="hint" style="margin-top:8px;">📌 ページヘッダーに表示されます。1ページに3枚ずつ出力されます。</div>
+  </div>
+  <div class="section">
+    <div class="section-title blue">写真 <span class="count-badge blue" id="s-photoCount">0</span></div>
+    <button onclick="sApplyAllCategories()" style="width:100%;margin-bottom:10px;padding:10px 16px;background:rgba(74,158,255,.15);border:1px solid rgba(74,158,255,.4);border-radius:8px;color:var(--accent3);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;letter-spacing:.03em;">
+      📋 カテゴリーを全写真の備考欄に一括反映
+    </button>
+    <div class="upload-area blue" id="s-uploadArea">
+      <div class="icon">🗾</div>
+      <p><strong>タップして写真を選択</strong></p>
+      <p>写真を追加→各写真に備考を入力してください</p>
+    </div>
+    <input type="file" id="s-fileInput" accept="image/*" multiple class="file-input-hidden">
+    <div class="photo-list" id="s-photoList"><div class="empty-state">写真を追加してください</div></div>
+  </div>
+</main>
+<div class="fab-area">
+  <button class="fab fab-pdf-sokuryou" onclick="sGeneratePDF()">📄 PDF出力（測量）</button>
+</div>
+</div>
+
+<!-- ポップアップ（現場用） -->
 <div class="popup-overlay" id="popupOverlay" onclick="closeNumPopup()"></div>
 <div class="num-popup" id="numPopup">
   <p id="numPopupLabel">PDF順を入力</p>
@@ -144,89 +240,280 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 <div class="toast" id="toast"></div>
 
 <script>
+// ===================== TAB =====================
+function switchTab(tab){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+tab).classList.add('active');
+  document.getElementById('tab-'+tab).classList.add('active');
+}
+
+// ===================== TOAST / PROGRESS =====================
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+function showProgress(msg){document.getElementById('progressText').textContent=msg;document.getElementById('progressOverlay').classList.add('show');}
+function hideProgress(){document.getElementById('progressOverlay').classList.remove('show');}
+
+// ===================== 共通ユーティリティ =====================
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function gp(e,canvas){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*(canvas.width/r.width),y:(e.clientY-r.top)*(canvas.height/r.height)};}
+function drawCircle(ctx,cx,cy,r,preview=false){
+  if(r<3)return;
+  ctx.save();ctx.strokeStyle='#ff1111';ctx.lineWidth=Math.max(r*0.18,7);
+  ctx.shadowColor='rgba(255,0,0,0.35)';ctx.shadowBlur=10;
+  if(preview)ctx.globalAlpha=0.55;
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();ctx.restore();
+}
+
+// ===================== TEXT→PDF (Japanese canvas) =====================
+function addTextToPDF(doc,text,x,y,fontSize){
+  if(!text)return;
+  const scale=4,DPI=96,ptToPx=DPI/72;
+  const fPx=fontSize*ptToPx*scale;
+  const tmp=document.createElement('canvas');tmp.width=1;tmp.height=1;
+  const tctx=tmp.getContext('2d');
+  tctx.font=`${fPx}px 'Noto Sans JP', sans-serif`;
+  const measured=tctx.measureText(text);
+  const textW=Math.ceil(measured.width)+8,textH=Math.ceil(fPx*1.4);
+  const c=document.createElement('canvas');c.width=textW;c.height=textH;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#000000';ctx.font=`${fPx}px 'Noto Sans JP', sans-serif`;ctx.textBaseline='top';
+  ctx.fillText(text,2,0);
+  const mmW=textW/(scale*ptToPx)*25.4/DPI,mmH=textH/(scale*ptToPx)*25.4/DPI;
+  doc.addImage(c.toDataURL('image/png'),'PNG',x,y-mmH*0.82,mmW,mmH);
+}
+
+// =========================================================
+//  ★ 汎用ドラッグ＆ドロップ並べ替えエンジン
+// =========================================================
+// 使い方: initDragSort(listEl, getArray, setArray, onSorted, isSokuryou)
+//   listEl    : .photo-list の要素
+//   getArray  : () => photos 配列を返す関数
+//   setArray  : (newArr) => 配列をセットする関数
+//   onSorted  : 並べ替え完了後に呼ぶ再描画関数
+//   isSokuryou: 測量モードかどうか（色分け用）
+
+function initDragSort(listEl, getArray, setArray, onSorted, isSokuryou=false){
+
+  // ドロップインジケーター（共有1つ）
+  const indicator = document.createElement('div');
+  indicator.className = 'drop-indicator' + (isSokuryou ? ' sokuryou' : '');
+  document.body.appendChild(indicator);
+
+  let dragId = null;        // ドラッグ中カードのdata-id
+  let ghost  = null;        // タッチ用ゴースト要素
+  let ghostOffX = 0;        // ゴーストのオフセット
+  let ghostOffY = 0;
+  let currentTarget = null; // 現在ホバー中のカード
+  let insertAfter = false;  // ターゲットの前か後か
+
+  // ---- カードのハンドルからドラッグ開始 ----
+  listEl.addEventListener('mousedown', e => {
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) return;
+    const card = handle.closest('.photo-card');
+    if (!card) return;
+    e.preventDefault();
+    startDrag(card, e.clientX, e.clientY, false);
+  });
+
+  listEl.addEventListener('touchstart', e => {
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) return;
+    const card = handle.closest('.photo-card');
+    if (!card) return;
+    const t = e.touches[0];
+    startDrag(card, t.clientX, t.clientY, true);
+  }, {passive: true});
+
+  function startDrag(card, clientX, clientY, isTouch) {
+    dragId = card.dataset.id;
+    card.classList.add('dragging');
+
+    // ゴースト（タッチ用：マウスはブラウザネイティブでプレビューがある）
+    if (isTouch) {
+      ghost = card.cloneNode(true);
+      ghost.className = 'drag-ghost' + (isSokuryou ? ' sokuryou' : '');
+      const rect = card.getBoundingClientRect();
+      ghost.style.width  = rect.width + 'px';
+      ghost.style.height = rect.height + 'px';
+      ghostOffX = clientX - rect.left;
+      ghostOffY = clientY - rect.top;
+      ghost.style.left = (clientX - ghostOffX) + 'px';
+      ghost.style.top  = (clientY - ghostOffY) + 'px';
+      // キャンバスは描画できないので非表示にする
+      ghost.querySelectorAll('canvas').forEach(c => c.style.display='none');
+      document.body.appendChild(ghost);
+    }
+
+    if (isTouch) {
+      document.addEventListener('touchmove', onTouchMove, {passive: false});
+      document.addEventListener('touchend',  onTouchEnd,  {passive: true});
+    } else {
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup',   onMouseUp);
+    }
+  }
+
+  // 自動スクロール用
+  let scrollRAF = null;
+  function autoScroll(clientY) {
+    const ZONE = 80;   // 画面端からこの距離でスクロール開始（px）
+    const MAX  = 18;   // 最大スクロール速度（px/frame）
+    const vh   = window.innerHeight;
+    let speed  = 0;
+    if (clientY < ZONE)       speed = -MAX * (1 - clientY / ZONE);
+    else if (clientY > vh - ZONE) speed =  MAX * (1 - (vh - clientY) / ZONE);
+    if (scrollRAF) cancelAnimationFrame(scrollRAF);
+    if (speed !== 0) {
+      const step = () => { window.scrollBy(0, speed); scrollRAF = requestAnimationFrame(step); };
+      scrollRAF = requestAnimationFrame(step);
+    }
+  }
+  function stopAutoScroll() { if (scrollRAF) { cancelAnimationFrame(scrollRAF); scrollRAF = null; } }
+
+  function onMouseMove(e) { updateDrag(e.clientX, e.clientY); autoScroll(e.clientY); }
+  function onTouchMove(e) {
+    e.preventDefault();
+    const t = e.touches[0];
+    if (ghost) {
+      ghost.style.left = (t.clientX - ghostOffX) + 'px';
+      ghost.style.top  = (t.clientY - ghostOffY) + 'px';
+    }
+    updateDrag(t.clientX, t.clientY);
+    autoScroll(t.clientY);
+  }
+
+  function updateDrag(clientX, clientY) {
+    // 現在位置にあるカードを探す
+    const cards = [...listEl.querySelectorAll('.photo-card:not(.dragging)')];
+    let found = null; let after = false;
+    for (const c of cards) {
+      const r = c.getBoundingClientRect();
+      if (clientY >= r.top && clientY <= r.bottom) {
+        found = c;
+        after = clientY > r.top + r.height / 2;
+        break;
+      }
+    }
+    currentTarget = found ? found.dataset.id : null;
+    insertAfter = after;
+
+    // インジケーターの位置を更新
+    if (found) {
+      const r = found.getBoundingClientRect();
+      const y = after ? r.bottom : r.top;
+      indicator.style.position = 'fixed';
+      indicator.style.left  = r.left + 'px';
+      indicator.style.width = r.width + 'px';
+      indicator.style.top   = (y - 2) + 'px';
+      indicator.classList.add('visible');
+    } else {
+      indicator.classList.remove('visible');
+    }
+  }
+
+  function onMouseUp()  { stopAutoScroll(); finishDrag(); document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); }
+  function onTouchEnd() { stopAutoScroll(); finishDrag(); document.removeEventListener('touchmove', onTouchMove); document.removeEventListener('touchend', onTouchEnd); }
+
+  function finishDrag() {
+    indicator.classList.remove('visible');
+    if (ghost) { ghost.remove(); ghost = null; }
+
+    // カードを元の見た目に戻す
+    listEl.querySelectorAll('.photo-card.dragging').forEach(c => c.classList.remove('dragging'));
+
+    if (!dragId || !currentTarget || dragId === currentTarget) { dragId = null; return; }
+
+    // 配列を並べ替える
+    const arr = getArray();
+    const fromIdx = arr.findIndex(p => p.id === dragId);
+    let toIdx     = arr.findIndex(p => p.id === currentTarget);
+    if (fromIdx < 0 || toIdx < 0) { dragId = null; return; }
+
+    const [moved] = arr.splice(fromIdx, 1);
+    // splice後のtoIdxを再計算
+    toIdx = arr.findIndex(p => p.id === currentTarget);
+    if (insertAfter) toIdx += 1;
+    arr.splice(toIdx, 0, moved);
+
+    setArray(arr);
+    onSorted();
+    showToast('順番を変更しました');
+    dragId = null;
+  }
+}
+
+
+// =========================================================
+//  現場（杭打ち）ロジック
+// =========================================================
 let photos   = [];
 let pdfOrder = [];
 const canvasState = {};
 let popupTargetId = null;
 
-// ======== 現場情報の保存・復元 ========
-function saveField() {
-  sessionStorage.setItem('fieldName', document.getElementById('fieldName').value);
-}
-function restoreField() {
-  const fn = sessionStorage.getItem('fieldName');
-  if (fn) document.getElementById('fieldName').value = fn;
-}
-document.addEventListener('DOMContentLoaded', restoreField);
+function saveField(){sessionStorage.setItem('fieldName',document.getElementById('fieldName').value);}
+function restoreField(){const fn=sessionStorage.getItem('fieldName');if(fn)document.getElementById('fieldName').value=fn;}
+document.addEventListener('DOMContentLoaded',()=>{
+  restoreField();
+  // DnD初期化（現場）
+  initDragSort(
+    document.getElementById('photoList'),
+    ()=> photos,
+    arr =>{ photos = arr; pdfOrder = photos.map(p=>p.id); },
+    renderAll,
+    false
+  );
+  // DnD初期化（測量）
+  initDragSort(
+    document.getElementById('s-photoList'),
+    ()=> sPhotos,
+    arr =>{ sPhotos = arr; },
+    sRenderAll,
+    true
+  );
+});
 document.getElementById('fieldName').addEventListener('input', saveField);
 
-// ======== 近景/遠景判定 ========
-function isKinkei(pdfIdx) { return pdfIdx % 2 === 0; }
+function isKinkei(pdfIdx){return pdfIdx%2===0;}
 
-// 各近景カードの点番号を取得（ペアの近景カードのidから）
-function getPointNum(pdfIdx) {
-  // pdfIdxが近景なら自分の入力、遠景なら1つ前（近景）の入力を使う
-  const kinkeiIdx = isKinkei(pdfIdx) ? pdfIdx : pdfIdx - 1;
-  const kinkeiId  = pdfOrder[kinkeiIdx];
-  if (!kinkeiId) return '';
-  const el = document.getElementById('point_' + kinkeiId);
-  return el ? el.value.trim() : '';
-}
+document.getElementById('uploadArea').addEventListener('click',()=>document.getElementById('fileInput').click());
+document.getElementById('fileInput').addEventListener('change',e=>{handleFiles(e.target.files);e.target.value='';});
 
-function makeCaption(pdfIdx) {
-  const sp    = getPointNum(pdfIdx);
-  const label = isKinkei(pdfIdx) ? '（近景）' : '（遠景）';
-  return sp ? `${sp}　${label}` : label;
-}
-
-// ======== アップロード ========
-document.getElementById('uploadArea').addEventListener('click', () => document.getElementById('fileInput').click());
-document.getElementById('fileInput').addEventListener('change', e => { handleFiles(e.target.files); e.target.value = ''; });
-
-function handleFiles(files) {
-  const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
-  if (!arr.length) return;
-  let loaded = 0;
-  const buf = new Array(arr.length);
-  arr.forEach((file, i) => {
-    const reader = new FileReader();
-    reader.onload = ev => {
-      buf[i] = { id: 'p' + Date.now() + '_' + i, src: ev.target.result, circles: [], pointNum: '' };
-      if (++loaded === arr.length) {
-        photos   = photos.concat(buf);
-        pdfOrder = photos.map(p => p.id);
-        renderAll();
-      }
-    };
-    reader.readAsDataURL(file);
+function handleFiles(files){
+  const arr=Array.from(files).filter(f=>f.type.startsWith('image/'));if(!arr.length)return;
+  let loaded=0;const buf=new Array(arr.length);
+  arr.forEach((file,i)=>{
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      buf[i]={id:'p'+Date.now()+'_'+i,src:ev.target.result,circles:[],pointNum:''};
+      if(++loaded===arr.length){photos=photos.concat(buf);pdfOrder=photos.map(p=>p.id);renderAll();}
+    };reader.readAsDataURL(file);
   });
 }
 
-// ======== レンダリング ========
-function renderAll() {
+function renderAll(){
   saveField();
-  const list = document.getElementById('photoList');
-  document.getElementById('photoCount').textContent = photos.length;
-  if (!photos.length) { list.innerHTML = '<div class="empty-state">写真を追加してください</div>'; return; }
-  list.innerHTML = '';
+  const list=document.getElementById('photoList');
+  document.getElementById('photoCount').textContent=photos.length;
+  if(!photos.length){list.innerHTML='<div class="empty-state">写真を追加してください</div>';return;}
+  list.innerHTML='';
 
-  photos.forEach(p => {
+  photos.forEach((p,visualIdx)=>{
     const pdfIdx = pdfOrder.indexOf(p.id);
-    const kk     = isKinkei(pdfIdx >= 0 ? pdfIdx : 0);
-    const tc     = kk ? 'kinkei' : 'enkei';
-    const num    = pdfIdx >= 0 ? pdfIdx + 1 : '?';
-    const capLabel = kk ? '（近景）' : '（遠景）';
+    const kk = isKinkei(pdfIdx >= 0 ? pdfIdx : 0);
+    const tc = kk ? 'kinkei' : 'enkei';
+    const num = pdfIdx >= 0 ? pdfIdx + 1 : '?';
 
-    // 近景：点番号入力欄、遠景：バッジのみ
     const headerRight = kk
       ? `<div class="point-input-wrap">
            <label>点番号</label>
            <input class="point-input" type="text" id="point_${p.id}"
-             placeholder="例：BP3" value="${esc(p.pointNum || '')}"
-             oninput="onPointInput('${p.id}', this.value)"
+             placeholder="例：BP3" value="${esc(p.pointNum||'')}"
+             oninput="onPointInput('${p.id}',this.value)"
              onclick="event.stopPropagation()">
          </div>`
-      : `<span style="flex:1;font-size:12px;color:var(--text2);" id="enkei_cap_${p.id}">${capLabel}</span>`;
+      : `<span style="flex:1;font-size:12px;color:var(--text2);" id="enkei_cap_${p.id}">${p.pointNum?p.pointNum+'　（遠景）':'（遠景）'}</span>`;
 
     const mediaHtml = kk
       ? `<div class="preview-wrap">
@@ -240,10 +527,7 @@ function renderAll() {
                <button class="mode-btn active" id="btn_draw_${p.id}" onclick="setMode('${p.id}','draw')">✏️ 描く</button>
                <button class="mode-btn" id="btn_move_${p.id}" onclick="setMode('${p.id}','move')">✋ 移動</button>
              </div>
-             <div class="size-wrap">
-               <label>サイズ</label>
-               <input type="range" id="size_${p.id}" min="6" max="120" value="16">
-             </div>
+             <div class="size-wrap"><label>サイズ</label><input type="range" id="size_${p.id}" min="6" max="120" value="12"></div>
              <button class="btn btn-secondary" onclick="undoCircle('${p.id}')">↩</button>
              <button class="btn btn-danger" onclick="clearCircles('${p.id}')">🗑</button>
            </div>
@@ -254,283 +538,666 @@ function renderAll() {
     card.dataset.id = p.id;
     card.innerHTML = `
       <div class="card-header">
+        <div class="drag-handle" title="ドラッグして並べ替え"><span class="drag-handle-icon">⠿</span></div>
         <div class="photo-num ${tc}" style="cursor:pointer;" onclick="openNumPopup('${p.id}',this)" title="タップでPDF順変更">${num}</div>
         ${headerRight}
+        <button class="photo-replace" onclick="replacePhotoClick('${p.id}')">📷 差替</button>
+        <input type="file" accept="image/*" id="repl_${p.id}" class="file-input-hidden" onchange="replacePhoto('${p.id}',this)">
         <button class="photo-delete" onclick="deletePhoto('${p.id}')">🗑</button>
       </div>
       ${mediaHtml}`;
     list.appendChild(card);
-    if (!kk) setTimeout(() => initCanvas(p.id), 40);
+    if(!kk) setTimeout(()=>initCanvas(p.id), 40);
   });
 }
 
-function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-// 点番号入力時：自分の値を保存＋ペアの遠景バッジを更新
-function onPointInput(id, val) {
-  const p = photos.find(x => x.id === id);
-  if (p) p.pointNum = val;
-  // ペアの遠景のバッジを更新
-  const pdfIdx    = pdfOrder.indexOf(id);
-  const enkeiIdx  = pdfIdx + 1;
-  const enkeiId   = pdfOrder[enkeiIdx];
-  if (enkeiId) {
-    const badge = document.getElementById('enkei_cap_' + enkeiId);
-    if (badge) badge.textContent = val ? `${val}　（遠景）` : '（遠景）';
-  }
+function onPointInput(id,val){
+  const p=photos.find(x=>x.id===id);if(p)p.pointNum=val;
+  const pdfIdx=pdfOrder.indexOf(id);
+  const eid=pdfOrder[pdfIdx+1];
+  if(eid){const b=document.getElementById('enkei_cap_'+eid);if(b)b.textContent=val?`${val}　（遠景）`:'（遠景）';}
 }
 
-function deletePhoto(id) {
-  photos   = photos.filter(x => x.id !== id);
-  pdfOrder = pdfOrder.filter(x => x !== id);
-  delete canvasState[id];
-  if (popupTargetId === id) closeNumPopup();
-  renderAll();
+function deletePhoto(id){
+  photos=photos.filter(x=>x.id!==id);pdfOrder=pdfOrder.filter(x=>x!==id);
+  delete canvasState[id];if(popupTargetId===id)closeNumPopup();renderAll();
+}
+function replacePhotoClick(id){const el=document.getElementById("repl_"+id);if(el)el.click();}
+function replacePhoto(id,input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const p=photos.find(x=>x.id===id);if(!p)return;
+    p.src=ev.target.result;p.circles=[];delete canvasState[id];
+    renderAll();showToast("写真を差替えました");
+  };
+  reader.readAsDataURL(file);input.value="";
 }
 
-// ======== PDF順ポップアップ ========
-function openNumPopup(id, el) {
-  closeNumPopup();
-  popupTargetId = id;
-  const pdfIdx = pdfOrder.indexOf(id);
-  document.getElementById('numPopupLabel').textContent = `PDF順を入力（1〜${pdfOrder.length}）`;
-  const inp = document.getElementById('numPopupInput');
-  inp.max = pdfOrder.length; inp.value = pdfIdx >= 0 ? pdfIdx + 1 : 1;
-  const popup = document.getElementById('numPopup');
-  const rect  = el.getBoundingClientRect();
-  let top = rect.bottom + 6 + window.scrollY;
-  let left = rect.left;
-  if (left + 220 > window.innerWidth - 8) left = window.innerWidth - 228;
-  if (left < 8) left = 8;
-  popup.style.top = top + 'px'; popup.style.left = left + 'px';
-  popup.classList.add('open');
-  document.getElementById('popupOverlay').classList.add('show');
-  setTimeout(() => inp.select(), 60);
+// PDF順ポップアップ
+function openNumPopup(id,el){
+  closeNumPopup();popupTargetId=id;
+  const pdfIdx=pdfOrder.indexOf(id);
+  document.getElementById('numPopupLabel').textContent=`PDF順を入力（1〜${pdfOrder.length}）`;
+  const inp=document.getElementById('numPopupInput');inp.max=pdfOrder.length;inp.value=pdfIdx>=0?pdfIdx+1:1;
+  const popup=document.getElementById('numPopup');
+  const rect=el.getBoundingClientRect();
+  let top=rect.bottom+6+window.scrollY,left=rect.left;
+  if(left+220>window.innerWidth-8)left=window.innerWidth-228;if(left<8)left=8;
+  popup.style.top=top+'px';popup.style.left=left+'px';
+  popup.classList.add('open');document.getElementById('popupOverlay').classList.add('show');
+  setTimeout(()=>inp.select(),60);
 }
-function closeNumPopup() {
-  document.getElementById('numPopup').classList.remove('open');
-  document.getElementById('popupOverlay').classList.remove('show');
-  popupTargetId = null;
-}
-function applyNumMove() {
-  if (!popupTargetId) return;
-  const id   = popupTargetId;
-  const inp  = document.getElementById('numPopupInput');
-  let to     = parseInt(inp.value) - 1;
-  const from = pdfOrder.indexOf(id);
-  if (isNaN(to)||to<0) to=0;
-  if (to>=pdfOrder.length) to=pdfOrder.length-1;
-  if (from>=0&&from!==to){ const [m]=pdfOrder.splice(from,1); pdfOrder.splice(to,0,m); }
-  closeNumPopup();
-  renderAll();
-  showToast(`PDF順を ${from+1} → ${to+1} に変更しました`);
+function closeNumPopup(){document.getElementById('numPopup').classList.remove('open');document.getElementById('popupOverlay').classList.remove('show');popupTargetId=null;}
+function applyNumMove(){
+  if(!popupTargetId)return;const id=popupTargetId;
+  const inp=document.getElementById('numPopupInput');let to=parseInt(inp.value)-1;
+  const from=pdfOrder.indexOf(id);if(isNaN(to)||to<0)to=0;if(to>=pdfOrder.length)to=pdfOrder.length-1;
+  if(from>=0&&from!==to){const[m]=pdfOrder.splice(from,1);pdfOrder.splice(to,0,m);}
+  closeNumPopup();renderAll();showToast(`PDF順を ${from+1} → ${to+1} に変更しました`);
 }
 
-// ======== モード切替 ========
-function setMode(id, mode) {
-  const s = canvasState[id]; if (!s) return;
-  s.mode = mode;
-  const canvas = document.getElementById('canvas_' + id);
-  canvas.className = mode === 'move' ? 'mode-move' : 'mode-draw';
-  document.getElementById('btn_draw_' + id).classList.toggle('active', mode==='draw');
-  document.getElementById('btn_move_' + id).classList.toggle('active', mode==='move');
+// モード切替
+function setMode(id,mode){
+  const s=canvasState[id];if(!s)return;s.mode=mode;
+  const canvas=document.getElementById('canvas_'+id);
+  canvas.className=mode==='move'?'mode-move':'mode-draw';
+  document.getElementById('btn_draw_'+id).classList.toggle('active',mode==='draw');
+  document.getElementById('btn_move_'+id).classList.toggle('active',mode==='move');
 }
 
-// ======== キャンバス ========
-function initCanvas(id) {
+// キャンバス（現場）
+function initCanvas(id){
   const canvas=document.getElementById('canvas_'+id);
   const wrap=document.getElementById('wrap_'+id);
-  if(!canvas||!wrap) return;
-  const p=photos.find(x=>x.id===id); if(!p) return;
+  if(!canvas||!wrap)return;
+  const p=photos.find(x=>x.id===id);if(!p)return;
   const img=new Image();
   img.onload=()=>{
-    const W=img.width,H=img.height;
-    canvas.width=W; canvas.height=H;
+    const W=img.width,H=img.height;canvas.width=W;canvas.height=H;
     const dW=wrap.offsetWidth||(window.innerWidth-28);
-    canvas.style.width=dW+'px'; canvas.style.height=Math.round(dW*H/W)+'px';
+    canvas.style.width=dW+'px';canvas.style.height=Math.round(dW*H/W)+'px';
     const ctx=canvas.getContext('2d');
     canvasState[id]={img,ctx,W,H,mode:'draw',drawing:false,sx:0,sy:0,dragIdx:-1,dragOffX:0,dragOffY:0};
-    redrawCanvas(id);
-    canvas.addEventListener('mousedown', e=>onStart(e,id,canvas));
-    canvas.addEventListener('mousemove', e=>onMove(e,id,canvas));
-    canvas.addEventListener('mouseup',   e=>onEnd(e,id,canvas));
-    canvas.addEventListener('mouseleave',e=>onEnd(e,id,canvas));
-    canvas.addEventListener('touchstart',e=>{e.preventDefault();onStart(e.touches[0],id,canvas);},{passive:false});
-    canvas.addEventListener('touchmove', e=>{e.preventDefault();onMove(e.touches[0],id,canvas);},{passive:false});
-    canvas.addEventListener('touchend',  e=>{e.preventDefault();onEnd(e.changedTouches[0],id,canvas);},{passive:false});
-  };
-  img.src=p.src;
+    redrawCanvas_g(id);
+    canvas.addEventListener('mousedown',e=>onStart_g(e,id,canvas));
+    canvas.addEventListener('mousemove',e=>onMove_g(e,id,canvas));
+    canvas.addEventListener('mouseup',e=>onEnd_g(e,id,canvas));
+    canvas.addEventListener('mouseleave',e=>onEnd_g(e,id,canvas));
+    canvas.addEventListener('touchstart',e=>{e.preventDefault();onStart_g(e.touches[0],id,canvas);},{passive:false});
+    canvas.addEventListener('touchmove',e=>{e.preventDefault();onMove_g(e.touches[0],id,canvas);},{passive:false});
+    canvas.addEventListener('touchend',e=>{e.preventDefault();onEnd_g(e.changedTouches[0],id,canvas);},{passive:false});
+  };img.src=p.src;
 }
-function gp(e,canvas){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*(canvas.width/r.width),y:(e.clientY-r.top)*(canvas.height/r.height)};}
-function onStart(e,id,canvas){
-  const s=canvasState[id];if(!s)return;
-  const pt=gp(e,canvas);
+function onStart_g(e,id,canvas){
+  const s=canvasState[id];if(!s)return;const pt=gp(e,canvas);
   if(s.mode==='draw'){s.drawing=true;s.sx=pt.x;s.sy=pt.y;}
-  else{
-    const ph=photos.find(x=>x.id===id);
-    let minD=Infinity,minI=-1;
+  else{const ph=photos.find(x=>x.id===id);let minD=Infinity,minI=-1;
     (ph.circles||[]).forEach((c,i)=>{const d=Math.hypot(pt.x-c.cx,pt.y-c.cy);if(d<c.r*1.5&&d<minD){minD=d;minI=i;}});
-    s.dragIdx=minI;
-    if(minI>=0){s.dragOffX=pt.x-ph.circles[minI].cx;s.dragOffY=pt.y-ph.circles[minI].cy;canvas.classList.add('grabbing');}
+    s.dragIdx=minI;if(minI>=0){s.dragOffX=pt.x-ph.circles[minI].cx;s.dragOffY=pt.y-ph.circles[minI].cy;canvas.classList.add('grabbing');}
   }
 }
-function onMove(e,id,canvas){
-  const s=canvasState[id];if(!s)return;
-  const pt=gp(e,canvas);
-  if(s.mode==='draw'&&s.drawing){redrawCanvas(id);drawCircle(s.ctx,(pt.x+s.sx)/2,(pt.y+s.sy)/2,Math.max(Math.abs(pt.x-s.sx),Math.abs(pt.y-s.sy))/2,true);}
-  else if(s.mode==='move'&&s.dragIdx>=0){const ph=photos.find(x=>x.id===id);ph.circles[s.dragIdx].cx=pt.x-s.dragOffX;ph.circles[s.dragIdx].cy=pt.y-s.dragOffY;redrawCanvas(id);}
+function onMove_g(e,id,canvas){
+  const s=canvasState[id];if(!s)return;const pt=gp(e,canvas);
+  if(s.mode==='draw'&&s.drawing){redrawCanvas_g(id);drawCircle(s.ctx,(pt.x+s.sx)/2,(pt.y+s.sy)/2,Math.max(Math.abs(pt.x-s.sx),Math.abs(pt.y-s.sy))/2,true);}
+  else if(s.mode==='move'&&s.dragIdx>=0){const ph=photos.find(x=>x.id===id);ph.circles[s.dragIdx].cx=pt.x-s.dragOffX;ph.circles[s.dragIdx].cy=pt.y-s.dragOffY;redrawCanvas_g(id);}
 }
-function onEnd(e,id,canvas){
-  const s=canvasState[id];if(!s)return;
-  const pt=gp(e,canvas);
+function onEnd_g(e,id,canvas){
+  const s=canvasState[id];if(!s)return;const pt=gp(e,canvas);
   if(s.mode==='draw'&&s.drawing){
-    s.drawing=false;
-    const ph=photos.find(x=>x.id===id);
+    s.drawing=false;const ph=photos.find(x=>x.id===id);
     const dx=Math.abs(pt.x-s.sx),dy=Math.abs(pt.y-s.sy);
     if(dx<6&&dy<6){const r=parseInt(document.getElementById('size_'+id).value)*(s.W/canvas.offsetWidth);ph.circles.push({cx:s.sx,cy:s.sy,r});}
     else{ph.circles.push({cx:(pt.x+s.sx)/2,cy:(pt.y+s.sy)/2,r:Math.max(dx,dy)/2});}
-    redrawCanvas(id);
-  } else if(s.mode==='move'){s.dragIdx=-1;canvas.classList.remove('grabbing');}
+    redrawCanvas_g(id);
+  }else if(s.mode==='move'){s.dragIdx=-1;canvas.classList.remove('grabbing');}
 }
-function drawCircle(ctx,cx,cy,r,preview=false){
-  if(r<3)return;
-  ctx.save();ctx.strokeStyle='#ff1111';ctx.lineWidth=Math.max(r*0.13,5);
-  ctx.shadowColor='rgba(255,0,0,0.35)';ctx.shadowBlur=10;
-  if(preview)ctx.globalAlpha=0.55;
-  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();ctx.restore();
-}
-function redrawCanvas(id){
+function redrawCanvas_g(id){
   const s=canvasState[id];if(!s)return;
   const p=photos.find(x=>x.id===id);
   s.ctx.clearRect(0,0,s.W,s.H);s.ctx.drawImage(s.img,0,0);
   (p.circles||[]).forEach(c=>drawCircle(s.ctx,c.cx,c.cy,c.r));
 }
-function undoCircle(id){const p=photos.find(x=>x.id===id);if(p&&p.circles.length){p.circles.pop();redrawCanvas(id);}}
-function clearCircles(id){const p=photos.find(x=>x.id===id);if(p){p.circles=[];redrawCanvas(id);}}
+function undoCircle(id){const p=photos.find(x=>x.id===id);if(p&&p.circles.length){p.circles.pop();redrawCanvas_g(id);}}
+function clearCircles(id){const p=photos.find(x=>x.id===id);if(p){p.circles=[];redrawCanvas_g(id);}}
 
-// ======== PDF生成 ========
-// キャンバスでテキストを画像化してPDFに貼る
-function addTextToPDF(doc, text, x, y, fontSize) {
-  if (!text) return;
-  const scale  = 4;
-  const DPI    = 96;
-  const ptToPx = DPI / 72;
-  const fPx    = fontSize * ptToPx * scale;
-
-  // 仮キャンバスでテキスト幅を計測
-  const tmp  = document.createElement('canvas');
-  tmp.width  = 1; tmp.height = 1;
-  const tctx = tmp.getContext('2d');
-  tctx.font  = `${fPx}px 'Noto Sans JP', sans-serif`;
-  const measured = tctx.measureText(text);
-  const textW = Math.ceil(measured.width) + 8;
-  const textH = Math.ceil(fPx * 1.4);
-
-  // 本番キャンバス（テキストぴったりサイズ）
-  const c   = document.createElement('canvas');
-  c.width   = textW;
-  c.height  = textH;
-  const ctx = c.getContext('2d');
-  ctx.clearRect(0, 0, textW, textH);
-  ctx.fillStyle    = '#000000';
-  ctx.font         = `${fPx}px 'Noto Sans JP', sans-serif`;
-  ctx.textBaseline = 'top';
-  ctx.fillText(text, 2, 0);
-
-  // mm換算
-  const mmW = textW / (scale * ptToPx) * 25.4 / DPI;
-  const mmH = textH / (scale * ptToPx) * 25.4 / DPI;
-
-  // PDF貼り付け（y座標ベースライン調整）
-  doc.addImage(c.toDataURL('image/png'), 'PNG', x, y - mmH * 0.82, mmW, mmH);
-}
-
-async function buildPDF() {
-  const {jsPDF} = window.jspdf;
-  const doc = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-  // フォントはキャンバス経由で描画（CDN読み込み）
-
-  const PW=210,PH=297,ML=10,MR=10,MT=12,MB=10,CW=PW-ML-MR;
-  const fieldName = document.getElementById('fieldName').value.trim() || '現場写真集';
-  const ordered   = pdfOrder.map(id=>photos.find(p=>p.id===id)).filter(Boolean);
-
-  const headerH=14, capH=12, gapH=4;
-  const slotH=(PH-MT-MB-headerH-gapH)/2;
-  const imgH=slotH-capH;
-
-  for(let i=0;i<ordered.length;i++){
-    const p=ordered[i];
-    document.getElementById('progressText').textContent=`PDF生成中... (${i+1}/${ordered.length})`;
-
-    if(i%2===0){
-      if(i>0) doc.addPage();
-      // 現場名ヘッダー（キャンバス経由で日本語描画）
-      addTextToPDF(doc, fieldName, ML, MT+9, 20, PW);
-      doc.setDrawColor(0,0,0);doc.setLineWidth(0.3);
-      doc.line(ML,MT+headerH,PW-MR,MT+headerH);
-    }
-
-    const slot=i%2;
-    const yTop=MT+headerH+slot*(slotH+gapH);
-    const yImg=yTop+capH;
-
-    // キャプション：近景の点番号入力欄から取得
-    const kinkeiIdx = isKinkei(i) ? i : i-1;
-    const kinkeiId  = pdfOrder[kinkeiIdx];
-    const kinkeiP   = photos.find(x=>x.id===kinkeiId);
-    const sp        = kinkeiP ? (kinkeiP.pointNum||'') : '';
-    const label     = isKinkei(i) ? '（近景）' : '（遠景）';
-    const capText   = sp ? `${sp}　${label}` : label;
-
-    // キャプション（キャンバス経由で日本語描画）
-    addTextToPDF(doc, capText, ML, yTop+8, 20, PW);
-
-    doc.setDrawColor(180,180,180);doc.setLineWidth(0.3);
-    doc.rect(ML,yImg,CW,imgH);
-
-    const src=await getPhotoSrc(p,isKinkei(i));
-    const pr=doc.getImageProperties(src);
-    const asp=pr.width/pr.height;
-    let dW=CW,dH=dW/asp;
-    if(dH>imgH){dH=imgH;dW=dH*asp;}
-    doc.addImage(src,'JPEG',ML+(CW-dW)/2,yImg+(imgH-dH)/2,dW,dH);
-  }
-  return doc;
-}
-
-async function generatePDF() {
-  if(!photos.length){showToast('写真を追加してください');return;}
-  document.getElementById('progressOverlay').classList.add('show');
-  try{
-    const doc = await buildPDF();
-    const fieldName = document.getElementById('fieldName').value.trim() || '現場写真集';
-    doc.save(`現場写真集_${fieldName.slice(0,20)}.pdf`);
-    showToast('PDFを保存しました！');
-  }catch(err){console.error(err);showToast('エラー: '+err.message);}
-  finally{document.getElementById('progressOverlay').classList.remove('show');}
-}
-
-async function getPhotoSrc(p,kinkei){
-  if(kinkei) return p.src;
-  if(!p.circles||!p.circles.length) return p.src;
+async function getPhotoSrc_g(p,kinkei){
+  if(kinkei)return p.src;
+  if(!p.circles||!p.circles.length)return p.src;
   const canvas=document.getElementById('canvas_'+p.id);
-  if(canvas&&canvasState[p.id]) return canvas.toDataURL('image/jpeg',0.95);
+  if(canvas&&canvasState[p.id])return canvas.toDataURL('image/jpeg',0.50);
   return new Promise(res=>{
-    const img=new Image();
-    img.onload=()=>{
-      const oc=document.createElement('canvas');
-      oc.width=img.width;oc.height=img.height;
+    const img=new Image();img.onload=()=>{
+      const oc=document.createElement('canvas');oc.width=img.width;oc.height=img.height;
       const ctx=oc.getContext('2d');ctx.drawImage(img,0,0);
-      (p.circles||[]).forEach(c=>drawCircle(ctx,c.cx,c.cy,c.r));
-      res(oc.toDataURL('image/jpeg',0.95));
+      (p.circles||[]).forEach(c=>drawCircle(ctx,c.cx,c.cy,c.r));res(oc.toDataURL('image/jpeg',0.50));
     };img.src=p.src;
   });
 }
 
-function showToast(msg){
-  const t=document.getElementById('toast');
-  t.textContent=msg;t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),3000);
+async function generatePDF(){
+  if(!photos.length){showToast('写真を追加してください');return;}
+  showProgress('PDF生成中...');
+  try{
+    const{jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const PW=210,PH=297,ML=10,MR=10,MT=12,MB=10,CW=PW-ML-MR;
+    const fieldName=document.getElementById('fieldName').value.trim()||'現場写真集';
+    const ordered=pdfOrder.map(id=>photos.find(p=>p.id===id)).filter(Boolean);
+    const headerH=14,capH=12,gapH=4;
+    const slotH=(PH-MT-MB-headerH-gapH)/2;
+    const imgH=slotH-capH;
+    for(let i=0;i<ordered.length;i++){
+      const p=ordered[i];
+      showProgress(`PDF生成中... (${i+1}/${ordered.length})`);
+      if(i%2===0){
+        if(i>0)doc.addPage();
+        addTextToPDF(doc,fieldName,ML,MT+9,20);
+        doc.setDrawColor(0,0,0);doc.setLineWidth(0.3);doc.line(ML,MT+headerH,PW-MR,MT+headerH);
+      }
+      const slot=i%2;const yTop=MT+headerH+slot*(slotH+gapH);const yImg=yTop+capH;
+      const ki=isKinkei(i)?i:i-1;const kid=pdfOrder[ki];const kp=photos.find(x=>x.id===kid);
+      const sp=kp?(kp.pointNum||''):'';
+      const label=isKinkei(i)?'（近景）':'（遠景）';
+      const capText=sp?`${sp}　${label}`:label;
+      addTextToPDF(doc,capText,ML,yTop+8,20);
+      doc.setDrawColor(180,180,180);doc.setLineWidth(0.3);doc.rect(ML,yImg,CW,imgH);
+      const src=await getPhotoSrc_g(p,isKinkei(i));
+      const pr=doc.getImageProperties(src);const asp=pr.width/pr.height;
+      let dW=CW,dH=dW/asp;if(dH>imgH){dH=imgH;dW=dH*asp;}
+      doc.addImage(src,'JPEG',ML+(CW-dW)/2,yImg+(imgH-dH)/2,dW,dH);
+    }
+    doc.save(`現場写真集_${fieldName.slice(0,20)}.pdf`);
+    showToast('PDFを保存しました！');
+  }catch(err){console.error(err);showToast('エラー: '+err.message);}
+  finally{hideProgress();}
+}
+
+// =========================================================
+//  測量ロジック
+// =========================================================
+
+// ===== 測量カテゴリー定義 =====
+const S_CATS = [
+  { id:'road',   label:'前面道路',   order:1, subs:[{key:'dir', ph:'東・西・南・北'}] },
+  { id:'site',   label:'申請地',     order:2, subs:[] },
+  { id:'adj',    label:'隣接地',     order:3, subs:[{key:'dir', ph:'東・西・南・北'}] },
+  { id:'kbm',    label:'KBM',        order:4, subs:[{key:'type', ph:'マンホール・桝・消火栓等'}] },
+  { id:'border', label:'境界ライン', order:5, subs:[{key:'dir', ph:'東・西・南・北'},{key:'pts', ph:'K1→K2 など'}] },
+  { id:'encr',   label:'越境物',     order:6, subs:[{key:'type', ph:'内容を入力'}] },
+  { id:'other',  label:'その他',     order:7, subs:[{key:'type', ph:'内容を入力'}] },
+];
+function sCatById(id){ return S_CATS.find(c=>c.id===id)||S_CATS[S_CATS.length-1]; }
+function sCatOrder(p){ return sCatById(p.catId||'other').order; }
+function sCatLabel(p){
+  const cat=sCatById(p.catId||'other');
+  const subs=cat.subs.map(s=>p.catSubs&&p.catSubs[s.key]?p.catSubs[s.key]:'').filter(Boolean);
+  return subs.length ? cat.label+'（'+subs.join('・')+'）' : cat.label;
+}
+
+let sPhotos = [];
+let sIdCnt  = 0;
+const sCanvasState = {};
+
+document.getElementById('s-uploadArea').addEventListener('click',()=>document.getElementById('s-fileInput').click());
+document.getElementById('s-fileInput').addEventListener('change',e=>{sHandleFiles(e.target.files);e.target.value='';});
+
+function sHandleFiles(files){
+  const arr=Array.from(files).filter(f=>f.type.startsWith('image/'));if(!arr.length)return;
+  let loaded=0;const buf=new Array(arr.length);
+  arr.forEach((file,i)=>{
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      buf[i]={id:'s'+(sIdCnt++),src:ev.target.result,circles:[],biko:'',catId:'road',catSubs:{}};
+      if(++loaded===arr.length){sPhotos=sPhotos.concat(buf);sRenderAll();}
+    };reader.readAsDataURL(file);
+  });
+}
+
+function sRenderAll(){
+  const list=document.getElementById('s-photoList');
+  document.getElementById('s-photoCount').textContent=sPhotos.length;
+  if(!sPhotos.length){list.innerHTML='<div class="empty-state">写真を追加してください</div>';return;}
+  list.innerHTML='';
+
+  sPhotos.forEach((p,idx)=>{
+    // ページ区切りヒント（3枚ごと）
+    if(idx>0&&idx%3===0){
+      const hint=document.createElement('div');
+      hint.className='page-hint';
+      hint.textContent=`▼ ${Math.floor(idx/3)+1}ページ目 開始`;
+      list.appendChild(hint);
+    }
+
+    const card=document.createElement('div');
+    card.className='photo-card sokuryou-card';
+    card.dataset.id=p.id;
+
+    const header=document.createElement('div');
+    header.className='card-header';
+    header.innerHTML=`
+      <div class="drag-handle" title="ドラッグして並べ替え"><span class="drag-handle-icon">⠿</span></div>
+      <div class="photo-num sokuryou">${idx+1}</div>
+      <span style="flex:1;font-size:12px;color:var(--text2);">写真 ${idx+1}</span>
+      <button class="photo-replace" onclick="sReplacePhotoClick('${p.id}')">📷 差替</button>
+      <input type="file" accept="image/*" id="srepl_${p.id}" class="file-input-hidden" onchange="sReplacePhoto('${p.id}',this)">
+      <button class="photo-delete" onclick="sDeletePhoto('${p.id}')">🗑</button>`;
+    card.appendChild(header);
+
+    const bikoRow=document.createElement('div');
+    bikoRow.className='biko-row';
+
+    const canvasCol=document.createElement('div');
+    canvasCol.className='biko-canvas-col';
+    const canvasWrap=document.createElement('div');
+    canvasWrap.className='canvas-wrap';
+    canvasWrap.id='swrap_'+p.id;
+    const canvas=document.createElement('canvas');
+    canvas.id='scanvas_'+p.id;
+    canvas.className='mode-draw';
+    canvasWrap.appendChild(canvas);
+
+    const toolbar=document.createElement('div');
+    toolbar.className='canvas-toolbar';
+    toolbar.innerHTML=`
+      <div class="mode-btns">
+        <button class="mode-btn active" id="sbtn_draw_${p.id}" onclick="sSetMode('${p.id}','draw')">✏️ 描く</button>
+        <button class="mode-btn" id="sbtn_move_${p.id}" onclick="sSetMode('${p.id}','move')">✋ 移動</button>
+        <button class="mode-btn" id="sbtn_sel_${p.id}" onclick="sSetMode('${p.id}','select')">☞ 選択</button>
+      </div>
+      <div class="size-wrap"><label>サイズ</label><input type="range" id="ssize_${p.id}" min="6" max="120" value="12"></div>
+      <button class="btn btn-secondary" onclick="sUndoCircle('${p.id}')">↩</button>
+      <button class="btn btn-danger" onclick="sClearCircles('${p.id}')">🗑</button>`;
+    canvasWrap.appendChild(toolbar);
+
+    canvasCol.appendChild(canvasWrap);
+
+    const bikoRight=document.createElement('div');
+    bikoRight.className='biko-right-col';
+    const bikoLabel=document.createElement('div');
+    bikoLabel.className='biko-label';
+    bikoLabel.textContent='備考';
+    const bikoTA=document.createElement('textarea');
+    bikoTA.className='biko-textarea';
+    bikoTA.placeholder='前面道路\n申請地\n北側隣接地\nKBM など';
+    bikoTA.value=p.biko||'';
+    bikoTA.rows=6;
+    bikoTA.oninput=()=>{p.biko=bikoTA.value;};
+    bikoRight.appendChild(bikoLabel);
+    bikoRight.appendChild(bikoTA);
+
+    bikoRow.appendChild(canvasCol);
+    bikoRow.appendChild(bikoRight);
+    card.appendChild(bikoRow);
+
+    // カテゴリー行（bikoRowの後に追加）
+    const catRow=document.createElement('div');
+    catRow.className='cat-row';
+    catRow.id='catrow_'+p.id;
+    card.appendChild(catRow);
+
+    list.appendChild(card);
+
+    // DOMに追加してからカテゴリーUIを描画
+    sRenderCatRow(p);
+    setTimeout(()=>sInitCanvas(p.id),40);
+  });
+}
+
+
+
+// ===== カテゴリー一括反映 =====
+function sApplyAllCategories(){
+  sPhotos.forEach(p=>{
+    const label=sCatLabel(p);
+    const ta=document.querySelector('#catrow_'+p.id)?.closest('.photo-card')?.querySelector('.biko-textarea');
+    // bikoの先頭行をカテゴリーラベルで置換（または先頭に追加）
+    const lines=(p.biko||'').split('\n');
+    const isLabel=S_CATS.some(c=>lines[0].startsWith(c.label));
+    if(isLabel||!lines[0]){lines[0]=label;}else{lines.unshift(label);}
+    p.biko=lines.join('\n');
+    if(ta){ta.value=p.biko;}
+  });
+  showToast('全写真の備考欄にカテゴリーを反映しました');
+}
+
+// ===== カテゴリー行描画 =====
+function sRenderCatRow(p){
+  // sPhotos配列内の実オブジェクトを参照（確実に同一オブジェクトを操作）
+  const photo = sPhotos.find(x=>x.id===p.id) || p;
+  const row=document.getElementById('catrow_'+photo.id);if(!row)return;
+  row.innerHTML='';
+  // カテゴリーセレクト
+  const sel=document.createElement('select');
+  sel.className='cat-select';
+  S_CATS.forEach(c=>{
+    const opt=document.createElement('option');
+    opt.value=c.id; opt.textContent='①②③④⑤⑥⑦'[c.order-1]+' '+c.label;
+    if((photo.catId||'road')===c.id) opt.selected=true;
+    sel.appendChild(opt);
+  });
+  sel.onchange=()=>{
+    // sPhotos配列内のオブジェクトを直接更新
+    const target=sPhotos.find(x=>x.id===photo.id);
+    if(target){ target.catId=sel.value; target.catSubs={}; }
+    photo.catId=sel.value; photo.catSubs={};
+    sRenderCatRow(photo);
+  };
+  row.appendChild(sel);
+  // サブ入力欄
+  const cat=sCatById(photo.catId||'road');
+  cat.subs.forEach(s=>{
+    const inp=document.createElement('input');
+    inp.type='text'; inp.className='cat-sub-input';
+    inp.placeholder=s.ph;
+    inp.value=(photo.catSubs&&photo.catSubs[s.key])||'';
+    inp.oninput=()=>{
+      const target=sPhotos.find(x=>x.id===photo.id);
+      if(!photo.catSubs)photo.catSubs={};
+      photo.catSubs[s.key]=inp.value;
+      if(target){ if(!target.catSubs)target.catSubs={}; target.catSubs[s.key]=inp.value; }
+    };
+    row.appendChild(inp);
+  });
+
+}
+
+function sDeletePhoto(id){sPhotos=sPhotos.filter(x=>x.id!==id);delete sCanvasState[id];sRenderAll();}
+function sReplacePhotoClick(id){const el=document.getElementById("srepl_"+id);if(el)el.click();}
+function sReplacePhoto(id,input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const p=sPhotos.find(x=>x.id===id);if(!p)return;
+    p.src=ev.target.result;p.circles=[];delete sCanvasState[id];
+    sRenderAll();showToast("写真を差替えました");
+  };
+  reader.readAsDataURL(file);input.value="";
+}
+
+function sInitCanvas(id){
+  const canvas=document.getElementById('scanvas_'+id);
+  const wrap=document.getElementById('swrap_'+id);
+  if(!canvas||!wrap)return;
+  const p=sPhotos.find(x=>x.id===id);if(!p)return;
+  const img=new Image();
+  img.onload=()=>{
+    const W=img.width,H=img.height;canvas.width=W;canvas.height=H;
+    const totalW=wrap.parentElement.offsetWidth||(window.innerWidth-28);
+    const colW=Math.floor(totalW*0.75);
+    canvas.style.width=colW+'px';canvas.style.height=Math.round(colW*H/W)+'px';
+    const ctx=canvas.getContext('2d');
+    sCanvasState[id]={img,ctx,W,H,mode:'draw',drawing:false,sx:0,sy:0,dragIdx:-1,dragOffX:0,dragOffY:0,selectedIdx:-1};
+    sRedraw(id);
+    canvas.addEventListener('mousedown',e=>sOnStart(e,id,canvas));
+    canvas.addEventListener('mousemove',e=>sOnMove(e,id,canvas));
+    canvas.addEventListener('mouseup',e=>sOnEnd(e,id,canvas));
+    canvas.addEventListener('mouseleave',e=>sOnEnd(e,id,canvas));
+    canvas.addEventListener('touchstart',e=>{e.preventDefault();sOnStart(e.touches[0],id,canvas);},{passive:false});
+    canvas.addEventListener('touchmove',e=>{e.preventDefault();sOnMove(e.touches[0],id,canvas);},{passive:false});
+    canvas.addEventListener('touchend',e=>{e.preventDefault();sOnEnd(e.changedTouches[0],id,canvas);},{passive:false});
+  };img.src=p.src;
+}
+// ---- ハンドル種別 ----
+// 'center':移動, 'rx':横幅, 'ry':縦幅, 'rot':回転, null:なし
+function sHitHandle(pt, c) {
+  // ハンドル座標を計算（回転考慮）
+  const rot = c.rot||0;
+  const cos = Math.cos(rot), sin = Math.sin(rot);
+  // 右端(rx), 下端(ry), 右斜め上(回転)ハンドル
+  const handles = {
+    center: {x: c.cx, y: c.cy},
+    rx:     {x: c.cx + (c.rx||c.r)*cos, y: c.cy + (c.rx||c.r)*sin},
+    ry:     {x: c.cx - (c.ry||c.r)*sin, y: c.cy + (c.ry||c.r)*cos},
+    rot:    {x: c.cx + (c.rx||c.r)*cos*1.4, y: c.cy + (c.rx||c.r)*sin*1.4},
+  };
+  const THRESH = 18;
+  for(const [k,h] of Object.entries(handles)){
+    if(Math.hypot(pt.x-h.x, pt.y-h.y) < THRESH) return k;
+  }
+  return null;
+}
+
+function sSetMode(id,mode){
+  const s=sCanvasState[id];if(!s)return;
+  if(mode!=='select'){s.selectedIdx=-1;}
+  s.mode=mode;
+  const canvas=document.getElementById('scanvas_'+id);
+  canvas.className=mode==='move'?'mode-move':(mode==='select'?'mode-move':'mode-draw');
+  document.getElementById('sbtn_draw_'+id).classList.toggle('active',mode==='draw');
+  document.getElementById('sbtn_move_'+id).classList.toggle('active',mode==='move');
+  const sb=document.getElementById('sbtn_sel_'+id);if(sb)sb.classList.toggle('active',mode==='select');
+  sRedraw(id);
+}
+function sDeselect(id){
+  const s=sCanvasState[id];if(!s)return;
+  s.selectedIdx=-1;
+  sSetMode(id,'draw');sRedraw(id);
+}
+
+function sOnStart(e,id,canvas){
+  const s=sCanvasState[id];if(!s)return;const pt=gp(e,canvas);
+  if(s.mode==='draw'){s.drawing=true;s.sx=pt.x;s.sy=pt.y;}
+  else if(s.mode==='select'){
+    const p=sPhotos.find(x=>x.id===id);
+    // 選択中の楕円のハンドルを優先チェック
+    if(s.selectedIdx>=0){
+      const c=p.circles[s.selectedIdx];
+      const hit=sHitHandle(pt,c);
+      if(hit){
+        s.handleMode=hit;
+        s.handleStartPt={x:pt.x,y:pt.y};
+        s.handleStartC={cx:c.cx,cy:c.cy,rx:c.rx||c.r,ry:c.ry||c.r,rot:c.rot||0};
+        return;
+      }
+    }
+    // 楕円本体をクリックして選択
+    let minD=Infinity,minI=-1;
+    (p.circles||[]).forEach((c,i)=>{
+      const d=Math.hypot(pt.x-c.cx,pt.y-c.cy);
+      if(d<minD){minD=d;minI=i;}
+    });
+    // 閾値を大きく（楕円の最大半径＋余裕）
+    const thresh = minI>=0 ? Math.max((p.circles[minI].rx||p.circles[minI].r),(p.circles[minI].ry||p.circles[minI].r))*1.3+30 : 0;
+    if(minI>=0 && minD<thresh){
+      s.selectedIdx=minI;
+      const c=p.circles[minI];
+      s.handleMode='center';
+      s.handleStartPt={x:pt.x,y:pt.y};
+      s.handleStartC={cx:c.cx,cy:c.cy,rx:c.rx||c.r,ry:c.ry||c.r,rot:c.rot||0};
+    }else{
+      s.selectedIdx=-1;
+    }
+    sRedraw(id);
+  }
+  else if(s.mode==='move'){
+    const p=sPhotos.find(x=>x.id===id);let minD=Infinity,minI=-1;
+    (p.circles||[]).forEach((c,i)=>{const d=Math.hypot(pt.x-c.cx,pt.y-c.cy);const rr=Math.max(c.rx||c.r,c.ry||c.r);if(d<rr*1.5&&d<minD){minD=d;minI=i;}});
+    s.dragIdx=minI;if(minI>=0){s.dragOffX=pt.x-p.circles[minI].cx;s.dragOffY=pt.y-p.circles[minI].cy;canvas.classList.add('grabbing');}
+  }
+}
+function sOnMove(e,id,canvas){
+  const s=sCanvasState[id];if(!s)return;const pt=gp(e,canvas);
+  if(s.mode==='draw'&&s.drawing){
+    sRedraw(id);
+    const cx=(pt.x+s.sx)/2,cy=(pt.y+s.sy)/2;
+    const rx=Math.abs(pt.x-s.sx)/2,ry=Math.abs(pt.y-s.sy)/2;
+    drawEllipse(s.ctx,cx,cy,Math.max(rx,4),Math.max(ry,4),0,true);
+  }
+  else if(s.mode==='select'&&s.handleMode&&s.selectedIdx>=0){
+    const p=sPhotos.find(x=>x.id===id);
+    const c=p.circles[s.selectedIdx];
+    const sc=s.handleStartC;
+    const dx=pt.x-s.handleStartPt.x, dy=pt.y-s.handleStartPt.y;
+    if(s.handleMode==='center'){
+      c.cx=sc.cx+dx; c.cy=sc.cy+dy;
+    } else if(s.handleMode==='rx'){
+      // 横方向ハンドルのドラッグ距離をrxに反映
+      const rot=sc.rot, cos=Math.cos(rot), sin=Math.sin(rot);
+      const delta=dx*cos+dy*sin;
+      c.rx=Math.max(4, sc.rx+delta);
+    } else if(s.handleMode==='ry'){
+      const rot=sc.rot, cos=Math.cos(rot), sin=Math.sin(rot);
+      const delta=-dx*sin+dy*cos;
+      c.ry=Math.max(4, sc.ry+delta);
+    } else if(s.handleMode==='rot'){
+      // 楕円中心からのドラッグ角度で回転
+      const angle=Math.atan2(pt.y-c.cy, pt.x-c.cx);
+      c.rot=angle;
+    }
+    sRedraw(id);
+  }
+  else if(s.mode==='move'&&s.dragIdx>=0){
+    const p=sPhotos.find(x=>x.id===id);
+    p.circles[s.dragIdx].cx=pt.x-s.dragOffX;p.circles[s.dragIdx].cy=pt.y-s.dragOffY;sRedraw(id);
+  }
+}
+function sOnEnd(e,id,canvas){
+  const s=sCanvasState[id];if(!s)return;const pt=gp(e,canvas);
+  if(s.mode==='draw'&&s.drawing){
+    s.drawing=false;const p=sPhotos.find(x=>x.id===id);
+    const dx=Math.abs(pt.x-s.sx),dy=Math.abs(pt.y-s.sy);
+    const scale=s.W/canvas.offsetWidth;
+    if(dx<6&&dy<6){
+      const r=parseInt(document.getElementById('ssize_'+id).value)*scale;
+      p.circles.push({cx:s.sx,cy:s.sy,rx:r,ry:r,rot:0});
+    }else{
+      p.circles.push({cx:(pt.x+s.sx)/2,cy:(pt.y+s.sy)/2,rx:Math.max(dx/2,4),ry:Math.max(dy/2,4),rot:0});
+    }
+    sRedraw(id);
+  }else if(s.mode==='move'){s.dragIdx=-1;canvas.classList.remove('grabbing');}
+  else if(s.mode==='select'){s.handleMode=null;}
+}
+function drawEllipse(ctx,cx,cy,rx,ry,rot,preview=false){
+  if(rx<2&&ry<2)return;
+  ctx.save();
+  ctx.strokeStyle='#ff1111';
+  ctx.lineWidth=Math.max(Math.max(rx,ry)*0.06,2.5);
+  ctx.shadowColor='rgba(255,0,0,0.35)';ctx.shadowBlur=10;
+  if(preview)ctx.globalAlpha=0.5;
+  ctx.beginPath();ctx.ellipse(cx,cy,Math.max(rx,2),Math.max(ry,2),rot||0,0,Math.PI*2);ctx.stroke();
+  ctx.restore();
+}
+function drawHandle(ctx, x, y, color, label){
+  ctx.save();
+  ctx.fillStyle=color||'#ffffff';
+  ctx.strokeStyle='#333';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.arc(x,y,10,0,Math.PI*2);ctx.fill();ctx.stroke();
+  if(label){ctx.fillStyle='#222';ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,x,y);}
+  ctx.restore();
+}
+function sRedraw(id){
+  const s=sCanvasState[id];if(!s)return;
+  const p=sPhotos.find(x=>x.id===id);
+  s.ctx.clearRect(0,0,s.W,s.H);s.ctx.drawImage(s.img,0,0);
+  (p.circles||[]).forEach((c,i)=>{
+    const rx=c.rx!==undefined?c.rx:c.r;
+    const ry=c.ry!==undefined?c.ry:c.r;
+    drawEllipse(s.ctx,c.cx,c.cy,rx,ry,c.rot||0);
+    // 選択中はハンドルを描画
+    if(s.selectedIdx===i){
+      // 選択枠（白点線）
+      s.ctx.save();s.ctx.strokeStyle='rgba(255,255,255,0.7)';s.ctx.lineWidth=1.5;s.ctx.setLineDash([5,4]);
+      s.ctx.beginPath();s.ctx.ellipse(c.cx,c.cy,Math.max(rx,2),Math.max(ry,2),c.rot||0,0,Math.PI*2);
+      s.ctx.stroke();s.ctx.restore();
+      // ハンドル座標
+      const rot=c.rot||0, cos=Math.cos(rot), sin=Math.sin(rot);
+      const hRx={x:c.cx+rx*cos,   y:c.cy+rx*sin};
+      const hRy={x:c.cx-ry*sin,   y:c.cy+ry*cos};
+      const hRot={x:c.cx+rx*cos*1.4, y:c.cy+rx*sin*1.4};
+      drawHandle(s.ctx,c.cx,c.cy,'#ffffff','✥');  // 中心：移動
+      drawHandle(s.ctx,hRx.x,hRx.y,'#f5a623','↔'); // rx：横幅
+      drawHandle(s.ctx,hRy.x,hRy.y,'#4a9eff','↕'); // ry：縦幅
+      drawHandle(s.ctx,hRot.x,hRot.y,'#aaffaa','↻'); // 回転
+    }
+  });
+}
+function sUndoCircle(id){const p=sPhotos.find(x=>x.id===id);if(p&&p.circles.length){p.circles.pop();sRedraw(id);}}
+function sClearCircles(id){const p=sPhotos.find(x=>x.id===id);if(p){p.circles=[];sRedraw(id);}}
+
+async function getSokuryouSrc(p){
+  const canvas=document.getElementById('scanvas_'+p.id);
+  if(canvas&&sCanvasState[p.id]){
+    const s=sCanvasState[p.id];
+    const savedIdx=s.selectedIdx;
+    s.selectedIdx=-1;   // ハンドル非表示
+    sRedraw(p.id);
+    const dataUrl=canvas.toDataURL('image/jpeg',0.50);
+    s.selectedIdx=savedIdx; // 元に戻す
+    sRedraw(p.id);
+    return dataUrl;
+  }
+  if(!p.circles||!p.circles.length)return p.src;
+  return new Promise(res=>{
+    const img=new Image();img.onload=()=>{
+      const oc=document.createElement('canvas');oc.width=img.width;oc.height=img.height;
+      const ctx=oc.getContext('2d');ctx.drawImage(img,0,0);
+      (p.circles||[]).forEach(c=>drawEllipse(ctx,c.cx,c.cy,c.rx!==undefined?c.rx:c.r,c.ry!==undefined?c.ry:c.r,c.rot||0));
+      res(oc.toDataURL('image/jpeg',0.50));
+    };img.src=p.src;
+  });
+}
+
+async function sGeneratePDF(){
+  if(!sPhotos.length){showToast('写真を追加してください');return;}
+  showProgress('PDF生成中...');
+  try{
+    // カテゴリー順でソート（元の配列は変更しない）
+    // catIdが未設定の場合は'road'をデフォルトとしてソート
+    const sortedPhotos=[...sPhotos].sort((a,b)=>{
+      const oa=sCatById(a.catId||'road').order;
+      const ob=sCatById(b.catId||'road').order;
+      return oa-ob;
+    });
+    const{jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const PW=210,PH=297,ML=12,MR=12,MT=10,MB=8;
+    const HEADER_H=13,BIKO_W=44;
+    const DIVIDER_X=PW-MR-BIKO_W;
+    const PHOTO_W=DIVIDER_X-ML-2;
+    const SLOT_COUNT=3;
+    const AVAIL_H=PH-MT-MB-HEADER_H-2;
+    const SLOT_H=AVAIL_H/SLOT_COUNT;
+    const bukken=document.getElementById('s-bukken').value.trim()||'（物件名未入力）';
+    const pageCount=Math.ceil(sortedPhotos.length/SLOT_COUNT);
+    for(let pg=0;pg<pageCount;pg++){
+      if(pg>0)doc.addPage();
+      showProgress(`PDF生成中... (${pg+1}/${pageCount}ページ)`);
+      addTextToPDF(doc,bukken,ML,MT+9,13);
+      addTextToPDF(doc,'備考',DIVIDER_X+3,MT+9,11);
+      doc.setDrawColor(30,40,70);doc.setLineWidth(0.5);doc.line(ML,MT+HEADER_H,PW-MR,MT+HEADER_H);
+      doc.setDrawColor(160,170,190);doc.setLineWidth(0.3);doc.line(DIVIDER_X,MT+HEADER_H,DIVIDER_X,PH-MB);
+      const startIdx=pg*SLOT_COUNT;
+      for(let s=0;s<SLOT_COUNT;s++){
+        const idx=startIdx+s;if(idx>=sortedPhotos.length)break;
+        const p=sortedPhotos[idx];
+        const slotY=MT+HEADER_H+2+s*SLOT_H;
+        const photoMaxH=SLOT_H-4,photoMaxW=PHOTO_W;
+        const src=await getSokuryouSrc(p);
+        const pr=doc.getImageProperties(src);const asp=pr.width/pr.height;
+        let dW=photoMaxW,dH=dW/asp;if(dH>photoMaxH){dH=photoMaxH;dW=dH*asp;}
+        doc.addImage(src,'JPEG',ML,slotY+(photoMaxH-dH)/2,dW,dH);
+        if(p.biko&&p.biko.trim()){
+          const lines=p.biko.split('\n');let lineY=slotY+10;
+          lines.forEach(line=>{
+            if(!line.trim())return;
+            addTextToPDF(doc,line.trim(),DIVIDER_X+3,lineY,18);
+            lineY+=11;
+          });
+        }
+        if(s<SLOT_COUNT-1&&idx<sPhotos.length-1){
+          doc.setDrawColor(200,210,225);doc.setLineWidth(0.2);
+          doc.line(ML,slotY+SLOT_H,PW-MR,slotY+SLOT_H);
+        }
+      }
+      doc.setFontSize(8);doc.setTextColor(160,170,190);
+      doc.text(`- ${pg+1} -`,PW/2,PH-3,{align:'center'});
+    }
+    const fname=(bukken.replace(/[^\w\u3040-\u9FFF\u4E00-\u9FFF]/g,'_').substring(0,25))||'測量写真集';
+    doc.save(`${fname}_測量写真集.pdf`);
+    showToast('PDFを保存しました！');
+  }catch(err){console.error(err);showToast('エラー: '+err.message);}
+  finally{hideProgress();}
 }
 </script>
 </body>
