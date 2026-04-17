@@ -232,6 +232,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
   </div>
 </main>
 <div class="fab-area">
+  <button class="fab" style="background:#2a7a4a;font-size:13px;padding:10px 16px;" onclick="sAutosave().then(()=>showToast('保存しました'))">💾 今すぐ保存</button>
   <button class="fab fab-pdf-sokuryou" onclick="sGeneratePDF()">📄 PDF出力（測量）</button>
 </div>
 </div>
@@ -604,6 +605,8 @@ function initDragSort(listEl, getArray, setArray, onSorted, isSokuryou=false){
     onSorted();
     showToast('順番を変更しました');
     dragId = null;
+    // 測量の場合は自動保存
+    if(typeof sPhotos!=='undefined'&&arr===sPhotos){ clearTimeout(window._sAutoSaveTimer); window._sAutoSaveTimer=setTimeout(sAutosave,1000); }
   }
 }
 
@@ -653,7 +656,7 @@ function handleFiles(files){
     const reader=new FileReader();
     reader.onload=async ev=>{
       // 長辺1920pxにリサイズしてメモリ削減
-      const resized=await resizeImage(ev.target.result,1920);
+      const resized=await resizeImage(ev.target.result,1280);
       buf[i]={id:'p'+Date.now()+'_'+i,src:resized,circles:[],pointNum:''};
       if(++loaded===arr.length){photos=photos.concat(buf);pdfOrder=photos.map(p=>p.id);renderAll();}
     };reader.readAsDataURL(file);
@@ -927,7 +930,7 @@ function sHandleFiles(files){
     const reader=new FileReader();
     reader.onload=async ev=>{
       // 長辺1920pxにリサイズしてメモリ削減
-      const resized=await resizeImage(ev.target.result,1920);
+      const resized=await resizeImage(ev.target.result,1280);
       buf[i]={id:'s'+(sIdCnt++),src:resized,circles:[],biko:'',catId:'road',catSubs:{}};
       if(++loaded===arr.length){
         sPhotos=sPhotos.concat(buf);
@@ -1044,6 +1047,7 @@ function sApplyAllCategories(){
     if(ta){ta.value=p.biko;}
   });
   showToast('全写真の備考欄にカテゴリーを反映しました');
+  clearTimeout(window._sAutoSaveTimer); window._sAutoSaveTimer=setTimeout(sAutosave,1000);
 }
 
 // ===== カテゴリー行描画 =====
@@ -1067,6 +1071,7 @@ function sRenderCatRow(p){
     if(target){ target.catId=sel.value; target.catSubs={}; }
     photo.catId=sel.value; photo.catSubs={};
     sRenderCatRow(photo);
+    clearTimeout(window._sAutoSaveTimer); window._sAutoSaveTimer=setTimeout(sAutosave,1000);
   };
   row.appendChild(sel);
   // サブ入力欄
@@ -1087,7 +1092,7 @@ function sRenderCatRow(p){
 
 }
 
-function sDeletePhoto(id){sPhotos=sPhotos.filter(x=>x.id!==id);delete sCanvasState[id];sRenderAll();}
+function sDeletePhoto(id){sPhotos=sPhotos.filter(x=>x.id!==id);delete sCanvasState[id];sRenderAll();sAutosave();}
 function sReplacePhotoClick(id){const el=document.getElementById("srepl_"+id);if(el)el.click();}
 function sReplacePhoto(id,input){
   const file=input.files[0];if(!file)return;
@@ -1262,6 +1267,9 @@ function sOnEnd(e,id,canvas){
       p.circles.push({cx:(pt.x+s.sx)/2,cy:(pt.y+s.sy)/2,rx:Math.max(dx/2,4),ry:Math.max(dy/2,4),rot:0});
     }
     sRedraw(id);
+    // 赤丸描画後に自動保存（1秒後）
+    clearTimeout(window._sAutoSaveTimer);
+    window._sAutoSaveTimer=setTimeout(sAutosave,1000);
   }else if(s.mode==='move'){s.dragIdx=-1;canvas.classList.remove('grabbing');}
   else if(s.mode==='select'){s.handleMode=null;}
 }
