@@ -1129,7 +1129,7 @@ function drawEllipse(ctx,cx,cy,rx,ry,rot,preview=false){
   if(rx<2&&ry<2)return;
   ctx.save();
   ctx.strokeStyle='#ff1111';
-  ctx.lineWidth=45;
+  ctx.lineWidth=35;
   ctx.shadowColor='rgba(255,0,0,0.35)';ctx.shadowBlur=10;
   if(preview)ctx.globalAlpha=0.5;
   ctx.beginPath();ctx.ellipse(cx,cy,Math.max(rx,2),Math.max(ry,2),rot||0,0,Math.PI*2);ctx.stroke();
@@ -1172,25 +1172,25 @@ function sUndoCircle(id){const p=sPhotos.find(x=>x.id===id);if(p&&p.circles.leng
 function sClearCircles(id){const p=sPhotos.find(x=>x.id===id);if(p){p.circles=[];sRedraw(id);}}
 
 async function getSokuryouSrc(p){
-  const canvas=document.getElementById('scanvas_'+p.id);
-  if(canvas&&sCanvasState[p.id]){
-    const s=sCanvasState[p.id];
-    const savedIdx=s.selectedIdx;
-    s.selectedIdx=-1;   // ハンドル非表示
-    sRedraw(p.id);
-    const dataUrl=canvas.toDataURL('image/jpeg',0.50);
-    s.selectedIdx=savedIdx; // 元に戻す
-    sRedraw(p.id);
-    return dataUrl;
-  }
-  if(!p.circles||!p.circles.length)return p.src;
-  return new Promise(res=>{
-    const img=new Image();img.onload=()=>{
-      const oc=document.createElement('canvas');oc.width=img.width;oc.height=img.height;
-      const ctx=oc.getContext('2d');ctx.drawImage(img,0,0);
-      (p.circles||[]).forEach(c=>drawEllipse(ctx,c.cx,c.cy,c.rx!==undefined?c.rx:c.r,c.ry!==undefined?c.ry:c.r,c.rot||0));
-      res(oc.toDataURL('image/jpeg',0.50));
-    };img.src=p.src;
+  // 常にオフスクリーンキャンバスで描画（キャンバス未初期化でも確実に動作）
+  return new Promise((res, rej)=>{
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const oc=document.createElement('canvas');
+        oc.width=img.width; oc.height=img.height;
+        const ctx=oc.getContext('2d');
+        ctx.drawImage(img,0,0);
+        (p.circles||[]).forEach(c=>{
+          const rx=c.rx!==undefined?c.rx:c.r;
+          const ry=c.ry!==undefined?c.ry:c.r;
+          drawEllipse(ctx,c.cx,c.cy,rx,ry,c.rot||0);
+        });
+        res(oc.toDataURL('image/jpeg',0.50));
+      }catch(e){ res(p.src); } // 描画失敗時は元画像を使用
+    };
+    img.onerror=()=>res(p.src);
+    img.src=p.src;
   });
 }
 
@@ -1252,7 +1252,10 @@ async function sGeneratePDF(){
     const fname=(bukken.replace(/[^\w\u3040-\u9FFF\u4E00-\u9FFF]/g,'_').substring(0,25))||'測量写真集';
     doc.save(`${fname}_測量写真集.pdf`);
     showToast('PDFを保存しました！');
-  }catch(err){console.error(err);showToast('エラー: '+err.message);}
+  }catch(err){
+    console.error('PDF生成エラー:',err);
+    showToast('PDFエラー: '+String(err.message||err));
+  }
   finally{hideProgress();}
 }
 
