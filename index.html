@@ -1323,7 +1323,7 @@ function drawEllipse(ctx,cx,cy,rx,ry,rot,preview=false){
   if(rx<2&&ry<2)return;
   ctx.save();
   ctx.strokeStyle='#ff1111';
-  ctx.lineWidth=35;
+  ctx.lineWidth=30;
   ctx.shadowColor='rgba(255,0,0,0.35)';ctx.shadowBlur=10;
   if(preview)ctx.globalAlpha=0.5;
   ctx.beginPath();ctx.ellipse(cx,cy,Math.max(rx,2),Math.max(ry,2),rot||0,0,Math.PI*2);ctx.stroke();
