@@ -464,7 +464,7 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').re
 function gp(e,canvas){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*(canvas.width/r.width),y:(e.clientY-r.top)*(canvas.height/r.height)};}
 function drawCircle(ctx,cx,cy,r,preview=false){
   if(r<3)return;
-  ctx.save();ctx.strokeStyle='#ff1111';ctx.lineWidth=18;
+  ctx.save();ctx.strokeStyle='#ff1111';ctx.lineWidth=12;
   ctx.shadowColor='rgba(255,0,0,0.35)';ctx.shadowBlur=10;
   if(preview)ctx.globalAlpha=0.55;
   ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();ctx.restore();
@@ -1323,7 +1323,7 @@ function drawEllipse(ctx,cx,cy,rx,ry,rot,preview=false){
   if(rx<2&&ry<2)return;
   ctx.save();
   ctx.strokeStyle='#ff1111';
-  ctx.lineWidth=30;
+  ctx.lineWidth=15;
   ctx.shadowColor='rgba(255,0,0,0.35)';ctx.shadowBlur=10;
   if(preview)ctx.globalAlpha=0.5;
   ctx.beginPath();ctx.ellipse(cx,cy,Math.max(rx,2),Math.max(ry,2),rot||0,0,Math.PI*2);ctx.stroke();
