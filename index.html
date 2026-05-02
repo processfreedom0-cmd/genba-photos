@@ -91,14 +91,14 @@ canvas{width:100%;display:block;touch-action:none;}
 canvas.mode-draw{cursor:crosshair;}
 canvas.mode-move{cursor:grab;}
 canvas.mode-move.grabbing{cursor:grabbing;}
-.canvas-toolbar{display:flex;gap:8px;padding:10px 12px;background:var(--surface);border-top:1px solid var(--border);flex-wrap:wrap;align-items:center;}
-.mode-btns{display:flex;gap:6px;}
-.mode-btn{padding:7px 12px;border-radius:7px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .15s;}
+.canvas-toolbar{display:flex;flex-direction:column;gap:8px;padding:10px 12px;background:var(--surface);border-top:1px solid var(--border);}
+.mode-btns{display:flex;gap:6px;width:100%;}
+.mode-btn{flex:1;padding:10px 4px;border-radius:8px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .15s;text-align:center;}
 .mode-btn.active{background:var(--accent);color:white;border-color:var(--accent);}
-.size-wrap{display:flex;align-items:center;gap:8px;flex:1;min-width:110px;}
+.size-wrap{display:flex;align-items:center;gap:8px;width:100%;}
 .size-wrap label{font-size:11px;color:var(--text2);white-space:nowrap;}
 input[type="range"]{flex:1;accent-color:var(--accent);}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 12px;border-radius:7px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:none;white-space:nowrap;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:10px 0;border-radius:8px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;border:none;white-space:nowrap;flex:1;}
 .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
 .btn-danger{background:rgba(232,93,58,.15);color:var(--accent);border:1px solid rgba(232,93,58,.3);}
 .empty-state{text-align:center;padding:20px;color:var(--text2);font-size:14px;}
@@ -108,8 +108,8 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 /* ===== 測量：備考エリア ===== */
 .biko-row{display:flex;align-items:flex-start;gap:0;padding:0;background:#000;}
 .biko-canvas-col{flex:1;min-width:0;}
-.biko-right-col{width:90px;flex-shrink:0;background:var(--surface2);padding:10px 8px;display:flex;flex-direction:column;gap:4px;border-left:1px solid var(--border);}
-.biko-label{font-size:10px;color:var(--accent3);font-weight:700;letter-spacing:.05em;margin-bottom:4px;}
+.biko-right-col{display:none;}
+.biko-label{display:none;}
 .biko-textarea{width:100%;background:transparent;border:none;border-radius:0;color:var(--text);font-size:12px;font-family:inherit;padding:4px 7px;outline:none;resize:none;min-height:80px;line-height:1.5;}
 .biko-textarea:focus{border-color:var(--accent3);}
 .biko-textarea::placeholder{color:var(--text2);font-size:11px;}
@@ -1044,9 +1044,11 @@ function sRenderAll(){
         <button class="mode-btn" id="sbtn_move_${p.id}" onclick="sSetMode('${p.id}','move')">✋ 移動</button>
         <button class="mode-btn" id="sbtn_sel_${p.id}" onclick="sSetMode('${p.id}','select')">☞ 選択</button>
       </div>
-      <div class="size-wrap"><label>サイズ</label><input type="range" id="ssize_${p.id}" min="6" max="120" value="12"></div>
-      <button class="btn btn-secondary" onclick="sUndoCircle('${p.id}')">↩</button>
-      <button class="btn btn-danger" onclick="sClearCircles('${p.id}')">🗑</button>`;
+      <div class="size-wrap"><label style="font-size:12px;color:var(--text2);white-space:nowrap;">サイズ</label><input type="range" id="ssize_${p.id}" min="6" max="120" value="12" style="flex:1;"></div>
+      <div style="display:flex;gap:8px;width:100%;">
+        <button class="btn btn-secondary" onclick="sUndoCircle('${p.id}')" style="flex:1;">↩ 取消</button>
+        <button class="btn btn-danger" onclick="sClearCircles('${p.id}')" style="flex:1;">🗑 全消去</button>
+      </div>`;
     canvasWrap.appendChild(toolbar);
 
     canvasCol.appendChild(canvasWrap);
@@ -1165,7 +1167,7 @@ function sInitCanvas(id){
   img.onload=()=>{
     const W=img.width,H=img.height;canvas.width=W;canvas.height=H;
     const totalW=wrap.parentElement.offsetWidth||(window.innerWidth-28);
-    const colW=Math.floor(totalW*0.75);
+    const colW=Math.floor(totalW*1.0);
     canvas.style.width=colW+'px';canvas.style.height=Math.round(colW*H/W)+'px';
     const ctx=canvas.getContext('2d');
     // 既存の状態（赤丸・選択状態）を引き継ぐ
@@ -1407,7 +1409,7 @@ async function sGeneratePDF(){
     const{jsPDF}=window.jspdf;
     const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
     const PW=210,PH=297,ML=12,MR=12,MT=10,MB=8;
-    const HEADER_H=13,BIKO_W=44;
+    const HEADER_H=13,BIKO_W=55;
     const DIVIDER_X=PW-MR-BIKO_W;
     const PHOTO_W=DIVIDER_X-ML-2;
     const SLOT_COUNT=3;
@@ -1418,8 +1420,8 @@ async function sGeneratePDF(){
     for(let pg=0;pg<pageCount;pg++){
       if(pg>0)doc.addPage();
       showProgress(`PDF生成中... (${pg+1}/${pageCount}ページ)`);
-      addTextToPDF(doc,bukken,ML,MT+9,20);
-      addTextToPDF(doc,'備考',DIVIDER_X+3,MT+9,20);
+      addTextToPDF(doc,bukken,ML,MT+9,16);
+      addTextToPDF(doc,'撮影箇所',DIVIDER_X+3,MT+9,14);
       doc.setDrawColor(30,40,70);doc.setLineWidth(0.5);doc.line(ML,MT+HEADER_H,PW-MR,MT+HEADER_H);
       doc.setDrawColor(160,170,190);doc.setLineWidth(0.3);doc.line(DIVIDER_X,MT+HEADER_H,DIVIDER_X,PH-MB);
       const startIdx=pg*SLOT_COUNT;
@@ -1432,18 +1434,30 @@ async function sGeneratePDF(){
         const pr=doc.getImageProperties(src);const asp=pr.width/pr.height;
         let dW=photoMaxW,dH=dW/asp;if(dH>photoMaxH){dH=photoMaxH;dW=dH*asp;}
         doc.addImage(src,'JPEG',ML,slotY+(photoMaxH-dH)/2,dW,dH);
-        // カテゴリーラベルを先頭に自動出力
+        // カテゴリーラベルを先頭に自動出力（改行・折り返し対応）
         {
           const catLabel=sCatLabel(p);
           const bikoLines=(p.biko||'').split('\n').filter(l=>l.trim());
-          // 先頭行がカテゴリーラベルと重複していたら除去
           const filtered=bikoLines.filter(l=>!S_CATS.some(c=>l.startsWith(c.label)));
           const allLines=[catLabel,...filtered];
+          const FONT_SIZE=13;
+          const LINE_H=8;
+          const MAX_W=BIKO_W-6;
           let lineY=slotY+10;
-          allLines.forEach(line=>{
+          // カテゴリーラベルは「（」で改行して2行に分割
+          allLines.forEach((line,li)=>{
             if(!line.trim())return;
-            addTextToPDF(doc,line.trim(),DIVIDER_X+3,lineY,20);
-            lineY+=10;
+            // 括弧内（方角・点名）を改行して表示
+            const parts=line.split(/[（(]/);
+            if(parts.length>1){
+              addTextToPDF(doc,parts[0].trim(),DIVIDER_X+3,lineY,FONT_SIZE);
+              lineY+=LINE_H;
+              addTextToPDF(doc,'（'+parts.slice(1).join('（').replace(/）.*$/,'）'),DIVIDER_X+3,lineY,FONT_SIZE);
+              lineY+=LINE_H+2;
+            } else {
+              addTextToPDF(doc,line.trim(),DIVIDER_X+3,lineY,FONT_SIZE);
+              lineY+=LINE_H+2;
+            }
           });
         }
         if(s<SLOT_COUNT-1&&idx<sPhotos.length-1){
@@ -1714,7 +1728,7 @@ function onWindowResize(){
     if(!canvas||!wrap||!s)return;
     const totalW=wrap.parentElement?.offsetWidth||0;
     if(!totalW)return;
-    const colW=Math.floor(totalW*0.75);
+    const colW=Math.floor(totalW*1.0);
     canvas.style.width=colW+'px';
     canvas.style.height=Math.round(colW*s.H/s.W)+'px';
   });
