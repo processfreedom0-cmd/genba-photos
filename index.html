@@ -75,7 +75,7 @@ input[type="text"]::placeholder{color:var(--text2);}
 .photo-num.kinkei{background:var(--accent2);color:#1a1000;}
 .photo-num.enkei{background:var(--accent);color:white;}
 .photo-num.sokuryou{background:var(--accent3);color:white;}
-.point-input-wrap{flex:1;display:flex;align-items:center;gap:6px;}
+.point-input-wrap{width:100%;display:flex;align-items:center;gap:6px;padding:6px 12px;border-top:1px solid var(--border);}
 .point-input-wrap label{font-size:11px;color:var(--text2);white-space:nowrap;}
 .point-input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;font-family:inherit;padding:6px 10px;outline:none;}
 .point-input:focus{border-color:var(--accent2);}
@@ -110,7 +110,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 .biko-canvas-col{flex:1;min-width:0;}
 .biko-right-col{width:90px;flex-shrink:0;background:var(--surface2);padding:10px 8px;display:flex;flex-direction:column;gap:4px;border-left:1px solid var(--border);}
 .biko-label{font-size:10px;color:var(--accent3);font-weight:700;letter-spacing:.05em;margin-bottom:4px;}
-.biko-textarea{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:inherit;padding:6px 7px;outline:none;resize:none;min-height:80px;line-height:1.5;}
+.biko-textarea{width:100%;background:transparent;border:none;border-radius:0;color:var(--text);font-size:12px;font-family:inherit;padding:4px 7px;outline:none;resize:none;min-height:80px;line-height:1.5;}
 .biko-textarea:focus{border-color:var(--accent3);}
 .biko-textarea::placeholder{color:var(--text2);font-size:11px;}
 
@@ -719,15 +719,19 @@ function renderAll(){
     const tc = kk ? 'kinkei' : 'enkei';
     const num = pdfIdx >= 0 ? pdfIdx + 1 : '?';
 
+    // 近景：点番号をcard-headerと別行に分離してスマホでの潰れを防止
     const headerRight = kk
+      ? `<span style="flex:1;"></span>`
+      : `<span style="flex:1;font-size:12px;color:var(--text2);" id="enkei_cap_${p.id}">${p.pointNum?p.pointNum+'　（遠景）':'（遠景）'}</span>`;
+    const pointRow = kk
       ? `<div class="point-input-wrap">
-           <label>点番号</label>
+           <label style="font-size:12px;color:var(--text2);white-space:nowrap;flex-shrink:0;">点番号</label>
            <input class="point-input" type="text" id="point_${p.id}"
              placeholder="例：BP3" value="${esc(p.pointNum||'')}"
              oninput="onPointInput('${p.id}',this.value)"
              onclick="event.stopPropagation()">
          </div>`
-      : `<span style="flex:1;font-size:12px;color:var(--text2);" id="enkei_cap_${p.id}">${p.pointNum?p.pointNum+'　（遠景）':'（遠景）'}</span>`;
+      : '';
 
     const mediaHtml = kk
       ? `<div class="preview-wrap">
@@ -760,6 +764,7 @@ function renderAll(){
         <input type="file" accept="image/*" id="repl_${p.id}" class="file-input-hidden" onchange="replacePhoto('${p.id}',this)">
         <button class="photo-delete" onclick="deletePhoto('${p.id}')">🗑</button>
       </div>
+      ${pointRow}
       ${mediaHtml}`;
     list.appendChild(card);
     if(!kk) setupLazyCanvas('canvas_'+p.id,'wrap_'+p.id,()=>initCanvas(p.id));
@@ -1427,9 +1432,15 @@ async function sGeneratePDF(){
         const pr=doc.getImageProperties(src);const asp=pr.width/pr.height;
         let dW=photoMaxW,dH=dW/asp;if(dH>photoMaxH){dH=photoMaxH;dW=dH*asp;}
         doc.addImage(src,'JPEG',ML,slotY+(photoMaxH-dH)/2,dW,dH);
-        if(p.biko&&p.biko.trim()){
-          const lines=p.biko.split('\n');let lineY=slotY+10;
-          lines.forEach(line=>{
+        // カテゴリーラベルを先頭に自動出力
+        {
+          const catLabel=sCatLabel(p);
+          const bikoLines=(p.biko||'').split('\n').filter(l=>l.trim());
+          // 先頭行がカテゴリーラベルと重複していたら除去
+          const filtered=bikoLines.filter(l=>!S_CATS.some(c=>l.startsWith(c.label)));
+          const allLines=[catLabel,...filtered];
+          let lineY=slotY+10;
+          allLines.forEach(line=>{
             if(!line.trim())return;
             addTextToPDF(doc,line.trim(),DIVIDER_X+3,lineY,20);
             lineY+=10;
@@ -1678,6 +1689,38 @@ function setupLazyCanvas(canvasId, wrapId, initFn) {
     setTimeout(initFn, 40);
   }
 }
+
+
+// =========================================================
+//  画面回転・リサイズ時にキャンバスを再描画
+// =========================================================
+function onWindowResize(){
+  // 現場：表示中のキャンバスをリサイズ
+  photos.forEach(p=>{
+    const canvas=document.getElementById('canvas_'+p.id);
+    const wrap=document.getElementById('wrap_'+p.id);
+    const s=canvasState[p.id];
+    if(!canvas||!wrap||!s)return;
+    const dW=wrap.offsetWidth;
+    if(!dW)return;
+    canvas.style.width=dW+'px';
+    canvas.style.height=Math.round(dW*s.H/s.W)+'px';
+  });
+  // 測量：表示中のキャンバスをリサイズ
+  sPhotos.forEach(p=>{
+    const canvas=document.getElementById('scanvas_'+p.id);
+    const wrap=document.getElementById('swrap_'+p.id);
+    const s=sCanvasState[p.id];
+    if(!canvas||!wrap||!s)return;
+    const totalW=wrap.parentElement?.offsetWidth||0;
+    if(!totalW)return;
+    const colW=Math.floor(totalW*0.75);
+    canvas.style.width=colW+'px';
+    canvas.style.height=Math.round(colW*s.H/s.W)+'px';
+  });
+}
+window.addEventListener('orientationchange',()=>setTimeout(onWindowResize,300));
+window.addEventListener('resize',()=>{ clearTimeout(window._resizeTimer); window._resizeTimer=setTimeout(onWindowResize,200); });
 
 </script>
 </body>
