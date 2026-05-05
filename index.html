@@ -280,19 +280,31 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 // =========================================================
 //  画像リサイズ（長辺1920px上限）
 // =========================================================
-function resizeImage(src, maxSize=1920) {
+function resizeImage(src, maxSize=1280) {
   return new Promise(res => {
+    // タイムアウト：5秒以内に完了しなければ元画像を使用
+    const timer = setTimeout(() => res(src), 5000);
     const img = new Image();
     img.onload = () => {
-      const w = img.width, h = img.height;
-      const ratio = Math.min(maxSize/w, maxSize/h, 1);
-      const cw = Math.round(w*ratio), ch = Math.round(h*ratio);
-      const canvas = document.createElement('canvas');
-      canvas.width=cw; canvas.height=ch;
-      canvas.getContext('2d').drawImage(img,0,0,cw,ch);
-      res(canvas.toDataURL('image/jpeg', 0.82));
+      try {
+        const w = img.width, h = img.height;
+        const ratio = Math.min(maxSize/w, maxSize/h, 1);
+        const cw = Math.round(w*ratio), ch = Math.round(h*ratio);
+        const canvas = document.createElement('canvas');
+        canvas.width=cw; canvas.height=ch;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img,0,0,cw,ch);
+        // requestAnimationFrameで描画完了を待つ
+        requestAnimationFrame(()=>{
+          try {
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+            clearTimeout(timer);
+            res(dataUrl);
+          } catch(e){ clearTimeout(timer); res(src); }
+        });
+      } catch(e){ clearTimeout(timer); res(src); }
     };
-    img.onerror = () => res(src);
+    img.onerror = () => { clearTimeout(timer); res(src); };
     img.src = src;
   });
 }
@@ -1139,6 +1151,9 @@ function sRenderCatRow(p){
       if(!photo.catSubs)photo.catSubs={};
       photo.catSubs[s.key]=inp.value;
       if(target){ if(!target.catSubs)target.catSubs={}; target.catSubs[s.key]=inp.value; }
+      // サブ入力変更後に自動保存
+      clearTimeout(window._sAutoSaveTimer);
+      window._sAutoSaveTimer=setTimeout(sAutosave,1500);
     };
     row.appendChild(inp);
   });
@@ -1373,8 +1388,9 @@ function sUndoCircle(id){const p=sPhotos.find(x=>x.id===id);if(p&&p.circles.leng
 function sClearCircles(id){const p=sPhotos.find(x=>x.id===id);if(p){p.circles=[];sRedraw(id);}}
 
 async function getSokuryouSrc(p){
-  // 常にオフスクリーンキャンバスで描画（キャンバス未初期化でも確実に動作）
-  return new Promise((res, rej)=>{
+  if(!p.src){ return ''; }
+  return new Promise((res)=>{
+    const timer=setTimeout(()=>{ console.warn('getSokuryouSrc timeout:',p.id); res(p.src); }, 8000);
     const img=new Image();
     img.onload=()=>{
       try{
@@ -1383,14 +1399,20 @@ async function getSokuryouSrc(p){
         const ctx=oc.getContext('2d');
         ctx.drawImage(img,0,0);
         (p.circles||[]).forEach(c=>{
-          const rx=c.rx!==undefined?c.rx:c.r;
-          const ry=c.ry!==undefined?c.ry:c.r;
+          const rx=c.rx!==undefined?c.rx:(c.r||10);
+          const ry=c.ry!==undefined?c.ry:(c.r||10);
           drawEllipse(ctx,c.cx,c.cy,rx,ry,c.rot||0);
         });
-        res(oc.toDataURL('image/jpeg',0.50));
-      }catch(e){ res(p.src); } // 描画失敗時は元画像を使用
+        requestAnimationFrame(()=>{
+          try{
+            const dataUrl=oc.toDataURL('image/jpeg',0.50);
+            clearTimeout(timer);
+            res(dataUrl);
+          }catch(e){ clearTimeout(timer); res(p.src); }
+        });
+      }catch(e){ clearTimeout(timer); res(p.src); }
     };
-    img.onerror=()=>res(p.src);
+    img.onerror=()=>{ clearTimeout(timer); res(p.src); };
     img.src=p.src;
   });
 }
@@ -1430,6 +1452,8 @@ async function sGeneratePDF(){
         const p=sortedPhotos[idx];
         const slotY=MT+HEADER_H+2+s*SLOT_H;
         const photoMaxH=SLOT_H-4,photoMaxW=PHOTO_W;
+        // 各写真処理の間に少し待機してブラウザを安定させる
+        await new Promise(r=>setTimeout(r,30));
         const src=await getSokuryouSrc(p);
         const pr=doc.getImageProperties(src);const asp=pr.width/pr.height;
         let dW=photoMaxW,dH=dW/asp;if(dH>photoMaxH){dH=photoMaxH;dW=dH*asp;}
