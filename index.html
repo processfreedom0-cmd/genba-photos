@@ -961,11 +961,11 @@ async function generatePDF(){
 
 // ===== 測量カテゴリー定義 =====
 const S_CATS = [
-  { id:'road',    label:'前面道路',     order:1, subs:[{key:'dir',  ph:'東・西・南・北'}] },
+  { id:'road',    label:'前面道路',     order:1, subs:[{key:'dir',  ph:'東・西・南・北', type:'dir'}] },
   { id:'site',    label:'申請地',       order:2, subs:[] },
-  { id:'adj',     label:'隣接地',       order:3, subs:[{key:'dir',  ph:'東・西・南・北'}] },
+  { id:'adj',     label:'隣接地',       order:3, subs:[{key:'dir',  ph:'東・西・南・北', type:'dir'}] },
   { id:'kbm',     label:'KBM',          order:4, subs:[{key:'type', ph:'マンホール・桝・消火栓等'}] },
-  { id:'border',  label:'境界ライン',   order:5, subs:[{key:'dir',  ph:'東・西・南・北'},{key:'pts', ph:'K1→K2 など'}] },
+  { id:'border',  label:'境界ライン',   order:5, subs:[{key:'dir',  ph:'東・西・南・北', type:'dir'},{key:'pts', ph:'K1→K2 など'}] },
   { id:'encr',    label:'越境物',       order:6, subs:[{key:'type', ph:'内容を入力'}] },
   { id:'bpt_near',label:'境界点近景',   order:7, subs:[{key:'pt',   ph:'点名を入力'}] },
   { id:'bpt_far', label:'境界点遠景',   order:8, subs:[{key:'pt',   ph:'点名を入力'}] },
@@ -1139,22 +1139,45 @@ function sRenderCatRow(p){
     clearTimeout(window._sAutoSaveTimer); window._sAutoSaveTimer=setTimeout(sAutosave,1000);
   };
   row.appendChild(sel);
-  // サブ入力欄
+  // サブ入力欄（方角はプルダウン、その他はテキスト）
   const cat=sCatById(photo.catId||'road');
+  const DIR_OPTIONS=['','東側','西側','南側','北側'];
   cat.subs.forEach(s=>{
-    const inp=document.createElement('input');
-    inp.type='text'; inp.className='cat-sub-input';
-    inp.placeholder=s.ph;
-    inp.value=(photo.catSubs&&photo.catSubs[s.key])||'';
-    inp.oninput=()=>{
-      const target=sPhotos.find(x=>x.id===photo.id);
-      if(!photo.catSubs)photo.catSubs={};
-      photo.catSubs[s.key]=inp.value;
-      if(target){ if(!target.catSubs)target.catSubs={}; target.catSubs[s.key]=inp.value; }
-      // サブ入力変更後に自動保存
-      clearTimeout(window._sAutoSaveTimer);
-      window._sAutoSaveTimer=setTimeout(sAutosave,1500);
-    };
+    let inp;
+    if(s.type==='dir'){
+      // 方角プルダウン
+      inp=document.createElement('select');
+      inp.className='cat-sub-input';
+      inp.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:inherit;padding:5px 6px;outline:none;cursor:pointer;flex:1;min-width:70px;';
+      DIR_OPTIONS.forEach(opt=>{
+        const o=document.createElement('option');
+        o.value=opt; o.textContent=opt||'方角を選択';
+        if((photo.catSubs&&photo.catSubs[s.key])===opt) o.selected=true;
+        inp.appendChild(o);
+      });
+      inp.onchange=()=>{
+        const target=sPhotos.find(x=>x.id===photo.id);
+        if(!photo.catSubs)photo.catSubs={};
+        photo.catSubs[s.key]=inp.value;
+        if(target){ if(!target.catSubs)target.catSubs={}; target.catSubs[s.key]=inp.value; }
+        clearTimeout(window._sAutoSaveTimer);
+        window._sAutoSaveTimer=setTimeout(sAutosave,1500);
+      };
+    } else {
+      // テキスト入力
+      inp=document.createElement('input');
+      inp.type='text'; inp.className='cat-sub-input';
+      inp.placeholder=s.ph;
+      inp.value=(photo.catSubs&&photo.catSubs[s.key])||'';
+      inp.oninput=()=>{
+        const target=sPhotos.find(x=>x.id===photo.id);
+        if(!photo.catSubs)photo.catSubs={};
+        photo.catSubs[s.key]=inp.value;
+        if(target){ if(!target.catSubs)target.catSubs={}; target.catSubs[s.key]=inp.value; }
+        clearTimeout(window._sAutoSaveTimer);
+        window._sAutoSaveTimer=setTimeout(sAutosave,1500);
+      };
+    }
     row.appendChild(inp);
   });
 
@@ -1422,10 +1445,19 @@ async function sGeneratePDF(){
   showProgress('PDF生成中...');
   try{
     // カテゴリー順でソート（元の配列は変更しない）
-    // catIdが未設定の場合は'road'をデフォルトとしてソート
+    // 境界点近景・遠景は点名ごとに近景→遠景のペアで配置
     const sortedPhotos=[...sPhotos].sort((a,b)=>{
       const oa=sCatById(a.catId||'road').order;
       const ob=sCatById(b.catId||'road').order;
+      const isBptA=(a.catId==='bpt_near'||a.catId==='bpt_far');
+      const isBptB=(b.catId==='bpt_near'||b.catId==='bpt_far');
+      // 両方境界点写真の場合：点名で並べ、同点名は近景(7)→遠景(8)
+      if(isBptA&&isBptB){
+        const ptA=(a.catSubs&&a.catSubs.pt)||'';
+        const ptB=(b.catSubs&&b.catSubs.pt)||'';
+        if(ptA!==ptB) return ptA.localeCompare(ptB,'ja');
+        return oa-ob; // 同点名：近景(order7)→遠景(order8)
+      }
       return oa-ob;
     });
     const{jsPDF}=window.jspdf;
@@ -1442,8 +1474,8 @@ async function sGeneratePDF(){
     for(let pg=0;pg<pageCount;pg++){
       if(pg>0)doc.addPage();
       showProgress(`PDF生成中... (${pg+1}/${pageCount}ページ)`);
-      addTextToPDF(doc,bukken,ML,MT+9,16);
-      addTextToPDF(doc,'撮影箇所',DIVIDER_X+3,MT+9,14);
+      addTextToPDF(doc,bukken,ML,MT+9,18);
+      addTextToPDF(doc,'撮影箇所',DIVIDER_X+3,MT+9,16);
       doc.setDrawColor(30,40,70);doc.setLineWidth(0.5);doc.line(ML,MT+HEADER_H,PW-MR,MT+HEADER_H);
       doc.setDrawColor(160,170,190);doc.setLineWidth(0.3);doc.line(DIVIDER_X,MT+HEADER_H,DIVIDER_X,PH-MB);
       const startIdx=pg*SLOT_COUNT;
@@ -1464,8 +1496,8 @@ async function sGeneratePDF(){
           const bikoLines=(p.biko||'').split('\n').filter(l=>l.trim());
           const filtered=bikoLines.filter(l=>!S_CATS.some(c=>l.startsWith(c.label)));
           const allLines=[catLabel,...filtered];
-          const FONT_SIZE=13;
-          const LINE_H=8;
+          const FONT_SIZE=15;
+          const LINE_H=9;
           const MAX_W=BIKO_W-6;
           let lineY=slotY+10;
           // カテゴリーラベルは「（」で改行して2行に分割
