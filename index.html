@@ -206,7 +206,10 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 </main>
 <div class="fab-area">
   <button class="fab" style="background:#2a7a4a;font-size:20px;padding:10px;width:46px;height:46px;border-radius:50%;justify-content:center;" title="今すぐ保存" onclick="gAutosave().then(()=>showToast('保存しました'))">💾</button>
-  <button class="fab fab-pdf-genba" onclick="generatePDF()">📄 PDF出力（現場）</button>
+  <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
+    <button class="fab fab-pdf-genba" style="font-size:13px;padding:10px 16px;" onclick="generatePDF('screen')">📄 画面順で発行</button>
+    <button class="fab" style="background:#c0550a;font-size:13px;padding:10px 16px;" onclick="generatePDF('point')">🔢 点番号順で発行</button>
+  </div>
 </div>
 </div>
 
@@ -664,6 +667,21 @@ function initDragSort(listEl, getArray, setArray, onSorted, isSokuryou=false){
 }
 
 
+
+// 自然順ソート（1→2→9→10、A→B→C など）
+function naturalCompare(a, b) {
+  const re = /([a-zA-Zぁ-ゖァ-ヶ一-鿿々]+)|([0-9]+)/g;
+  const pa = String(a).match(re) || [];
+  const pb = String(b).match(re) || [];
+  for(let i = 0; i < Math.max(pa.length, pb.length); i++){
+    const ca = pa[i] || '', cb = pb[i] || '';
+    const na = parseInt(ca), nb = parseInt(cb);
+    if(!isNaN(na) && !isNaN(nb)){ if(na !== nb) return na - nb; }
+    else { const c = ca.localeCompare(cb, 'ja'); if(c !== 0) return c; }
+  }
+  return 0;
+}
+
 // =========================================================
 //  現場（杭打ち）ロジック
 // =========================================================
@@ -917,7 +935,7 @@ async function getPhotoSrc_g(p,kinkei){
   });
 }
 
-async function generatePDF(){
+async function generatePDF(sortMode='screen'){
   if(!photos.length){showToast('写真を追加してください');return;}
   showProgress('PDF生成中...');
   try{
@@ -925,7 +943,21 @@ async function generatePDF(){
     const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
     const PW=210,PH=297,ML=10,MR=10,MT=12,MB=10,CW=PW-ML-MR;
     const fieldName=document.getElementById('fieldName').value.trim()||'現場写真集';
-    const ordered=pdfOrder.map(id=>photos.find(p=>p.id===id)).filter(Boolean);
+    // 点番号順の場合：近景の点番号で近景・遠景ペアをソート
+    let ordered;
+    if(sortMode==='point'){
+      // 近景（偶数インデックス）の点番号でペアをソート
+      const base=pdfOrder.map(id=>photos.find(p=>p.id===id)).filter(Boolean);
+      const pairs=[];
+      for(let i=0;i<base.length;i+=2){
+        pairs.push({ near:base[i], far:base[i+1]||null, key:base[i].pointNum||'' });
+      }
+      pairs.sort((a,b)=>naturalCompare(a.key,b.key));
+      ordered=[];
+      pairs.forEach(pair=>{ ordered.push(pair.near); if(pair.far) ordered.push(pair.far); });
+    } else {
+      ordered=pdfOrder.map(id=>photos.find(p=>p.id===id)).filter(Boolean);
+    }
     const headerH=14,capH=12,gapH=4;
     const slotH=(PH-MT-MB-headerH-gapH)/2;
     const imgH=slotH-capH;
