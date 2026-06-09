@@ -192,6 +192,10 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
     <div class="section-title">現場情報</div>
     <input type="text" id="fieldName" placeholder="現場名（例：テスト）">
     <div class="hint" style="margin-top:8px;">📌 奇数枚目（近景）に点番号を入力 → 偶数枚目（遠景）に自動反映。編集内容は自動保存されます。<button onclick="if(confirm('保存データを消去しますか？')){gClearSaved();photos=[];pdfOrder=[];renderAll();document.getElementById('fieldName').value='';showToast('リセットしました');}" style="margin-left:8px;font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-family:inherit;">🗑 保存データ消去</button></div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button onclick="gSaveProject()" style="flex:1;padding:8px;border-radius:7px;border:1px solid var(--accent2);background:rgba(245,166,35,.12);color:var(--accent2);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;">💾 ファイルに保存</button>
+      <label style="flex:1;padding:8px;border-radius:7px;border:1px solid var(--accent3);background:rgba(74,158,255,.12);color:var(--accent3);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;text-align:center;display:block;">📂 ファイルから読込<input type="file" accept=".json" class="file-input-hidden" onchange="gLoadProject(this)"></label>
+    </div>
   </div>
   <div class="section">
     <div class="section-title">写真 <span class="count-badge" id="photoCount">0</span></div>
@@ -220,6 +224,10 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
     <div class="section-title blue">現場情報</div>
     <input type="text" id="s-bukken" placeholder="例：大阪市淀川区加島一丁目351-4（加島158①LS）" >
     <div class="hint" style="margin-top:8px;">📌 現場名がページヘッダーに表示されます。1ページに3枚ずつ出力されます。編集内容は自動保存されます。<button onclick="if(confirm('保存データを消去しますか？')){sClearSaved();sPhotos=[];sRenderAll();}" style="margin-left:8px;font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-family:inherit;">🗑 保存データ消去</button></div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button onclick="sSaveProject()" style="flex:1;padding:8px;border-radius:7px;border:1px solid var(--accent2);background:rgba(245,166,35,.12);color:var(--accent2);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;">💾 ファイルに保存</button>
+      <label style="flex:1;padding:8px;border-radius:7px;border:1px solid var(--accent3);background:rgba(74,158,255,.12);color:var(--accent3);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;text-align:center;display:block;">📂 ファイルから読込<input type="file" accept=".json" class="file-input-hidden" onchange="sLoadProject(this)"></label>
+    </div>
   </div>
   <div class="section">
     <div class="section-title blue">写真 <span class="count-badge blue" id="s-photoCount">0</span></div>
@@ -459,6 +467,107 @@ async function sRestore() {
 async function sClearSaved() {
   await idbClear();
   showToast('保存データを消去しました');
+}
+
+
+// =========================================================
+//  プロジェクト保存・読み込み（杭打ち・測量共通）
+// =========================================================
+
+// ---- 杭打ち：保存 ----
+function gSaveProject(){
+  if(!photos.length){ showToast('写真がありません'); return; }
+  const data = {
+    version: 1,
+    type: 'genba',
+    fieldName: document.getElementById('fieldName').value||'',
+    pdfOrder: pdfOrder,
+    photos: photos.map(p=>({
+      id: p.id,
+      src: p.src,
+      circles: p.circles||[],
+      pointNum: p.pointNum||''
+    }))
+  };
+  const blob = new Blob([JSON.stringify(data)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const name = (document.getElementById('fieldName').value||'現場写真集').slice(0,20);
+  a.download = name + '_杭打ち.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('プロジェクトを保存しました');
+}
+
+// ---- 杭打ち：読み込み ----
+function gLoadProject(input){
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const data = JSON.parse(e.target.result);
+      if(data.type !== 'genba') { showToast('杭打ち用のファイルではありません'); return; }
+      if(!confirm('現在の編集内容を破棄して読み込みますか？')) return;
+      document.getElementById('fieldName').value = data.fieldName||'';
+      photos = data.photos.map(p=>({...p}));
+      pdfOrder = data.pdfOrder || photos.map(p=>p.id);
+      // idカウンタを更新
+      renderAll();
+      gAutosave();
+      showToast('プロジェクトを読み込みました（'+ photos.length +'枚）');
+    }catch(err){ showToast('読み込みエラー: ファイルが正しくありません'); }
+  };
+  reader.readAsText(file);
+  input.value='';
+}
+
+// ---- 測量：保存 ----
+function sSaveProject(){
+  if(!sPhotos.length){ showToast('写真がありません'); return; }
+  const data = {
+    version: 1,
+    type: 'sokuryou',
+    bukken: document.getElementById('s-bukken').value||'',
+    photos: sPhotos.map(p=>({
+      id: p.id,
+      src: p.src,
+      circles: p.circles||[],
+      biko: p.biko||'',
+      catId: p.catId||'road',
+      catSubs: p.catSubs||{}
+    }))
+  };
+  const blob = new Blob([JSON.stringify(data)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const name = (document.getElementById('s-bukken').value||'測量写真集').slice(0,20);
+  a.download = name + '_測量.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('プロジェクトを保存しました');
+}
+
+// ---- 測量：読み込み ----
+function sLoadProject(input){
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const data = JSON.parse(e.target.result);
+      if(data.type !== 'sokuryou') { showToast('測量用のファイルではありません'); return; }
+      if(!confirm('現在の編集内容を破棄して読み込みますか？')) return;
+      document.getElementById('s-bukken').value = data.bukken||'';
+      sPhotos = data.photos.map(p=>({...p}));
+      sIdCnt = Math.max(...sPhotos.map(p=>parseInt(p.id.replace('s',''))||0), 0) + 1;
+      sRenderAll();
+      sAutosave();
+      showToast('プロジェクトを読み込みました（'+ sPhotos.length +'枚）');
+    }catch(err){ showToast('読み込みエラー: ファイルが正しくありません'); }
+  };
+  reader.readAsText(file);
+  input.value='';
 }
 
 // ===================== TAB =====================
