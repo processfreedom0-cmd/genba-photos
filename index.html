@@ -1079,7 +1079,7 @@ async function generatePDF(sortMode='screen'){
         doc.setDrawColor(0,0,0);doc.setLineWidth(0.3);doc.line(ML,MT+headerH,PW-MR,MT+headerH);
       }
       const slot=i%2;const yTop=MT+headerH+slot*(slotH+gapH);const yImg=yTop+capH;
-      const ki=isKinkei(i)?i:i-1;const kid=pdfOrder[ki];const kp=photos.find(x=>x.id===kid);
+      const ki=isKinkei(i)?i:i-1;const kp=ordered[ki]; // orderedから取得（点番号順ソート対応）
       const sp=kp?(kp.pointNum||''):'';
       const label=isKinkei(i)?'（近景）':'（遠景）';
       const capText=sp?`${sp}　${label}`:label;
