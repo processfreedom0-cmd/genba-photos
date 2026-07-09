@@ -612,6 +612,51 @@ function addTextToPDF(doc,text,x,y,fontSize){
   doc.addImage(c.toDataURL('image/png'),'PNG',x,y-mmH*0.82,mmW,mmH);
 }
 
+// PDF用画像圧縮（長辺maxPx・品質q に再エンコードしてファイルサイズ削減）
+function compressForPDF(src, maxPx=1000, q=0.5){
+  return new Promise(res=>{
+    const timer=setTimeout(()=>res(src),8000);
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const ratio=Math.min(maxPx/img.width, maxPx/img.height, 1);
+        const cw=Math.round(img.width*ratio), ch=Math.round(img.height*ratio);
+        const c=document.createElement('canvas');
+        c.width=cw; c.height=ch;
+        c.getContext('2d').drawImage(img,0,0,cw,ch);
+        requestAnimationFrame(()=>{
+          try{ const d=c.toDataURL('image/jpeg',q); clearTimeout(timer); res(d); }
+          catch(e){ clearTimeout(timer); res(src); }
+        });
+      }catch(e){ clearTimeout(timer); res(src); }
+    };
+    img.onerror=()=>{ clearTimeout(timer); res(src); };
+    img.src=src;
+  });
+}
+
+// 折り返し対応テキスト出力（maxWmmで自動改行、次のY座標を返す）
+function addWrappedTextToPDF(doc,text,x,y,fontSize,maxWmm,lineHmm){
+  if(!text) return y;
+  const scale=4,DPI=96,ptToPx=DPI/72;
+  const fPx=fontSize*ptToPx*scale;
+  const tmp=document.createElement('canvas');tmp.width=1;tmp.height=1;
+  const tctx=tmp.getContext('2d');
+  tctx.font=`${fPx}px 'Noto Sans JP', sans-serif`;
+  const pxToMm=25.4/DPI/(scale*ptToPx);
+  const lines=[];
+  let line='';
+  for(const ch of String(text)){
+    const w=(tctx.measureText(line+ch).width+8)*pxToMm;
+    if(w>maxWmm && line){ lines.push(line); line=ch; }
+    else line+=ch;
+  }
+  if(line) lines.push(line);
+  let yy=y;
+  lines.forEach(l=>{ addTextToPDF(doc,l,x,yy,fontSize); yy+=lineHmm; });
+  return yy;
+}
+
 // =========================================================
 //  ★ 汎用ドラッグ＆ドロップ並べ替えエンジン
 // =========================================================
@@ -1085,7 +1130,8 @@ async function generatePDF(sortMode='screen'){
       const capText=sp?`${sp}　${label}`:label;
       addTextToPDF(doc,capText,ML,yTop+8,20);
       doc.setDrawColor(180,180,180);doc.setLineWidth(0.3);doc.rect(ML,yImg,CW,imgH);
-      const src=await getPhotoSrc_g(p,isKinkei(i));
+      const rawSrc=await getPhotoSrc_g(p,isKinkei(i));
+      const src=await compressForPDF(rawSrc,1000,0.5); // ファイルサイズ削減
       const pr=doc.getImageProperties(src);const asp=pr.width/pr.height;
       let dW=CW,dH=dW/asp;if(dH>imgH){dH=imgH;dW=dH*asp;}
       doc.addImage(src,'JPEG',ML+(CW-dW)/2,yImg+(imgH-dH)/2,dW,dH);
@@ -1627,7 +1673,8 @@ async function sGeneratePDF(){
         const photoMaxH=SLOT_H-4,photoMaxW=PHOTO_W;
         // 各写真処理の間に少し待機してブラウザを安定させる
         await new Promise(r=>setTimeout(r,30));
-        const src=await getSokuryouSrc(p);
+        const rawSrc=await getSokuryouSrc(p);
+        const src=await compressForPDF(rawSrc,1000,0.5); // ファイルサイズ削減
         const pr=doc.getImageProperties(src);const asp=pr.width/pr.height;
         let dW=photoMaxW,dH=dW/asp;if(dH>photoMaxH){dH=photoMaxH;dW=dH*asp;}
         doc.addImage(src,'JPEG',ML,slotY+(photoMaxH-dH)/2,dW,dH);
@@ -1641,19 +1688,17 @@ async function sGeneratePDF(){
           const LINE_H=9;
           const MAX_W=BIKO_W-6;
           let lineY=slotY+10;
-          // カテゴリーラベルは「（」で改行して2行に分割
+          // カテゴリーラベルは「（」で改行し、長い文字は列幅で自動折り返し
           allLines.forEach((line,li)=>{
             if(!line.trim())return;
-            // 括弧内（方角・点名）を改行して表示
             const parts=line.split(/[（(]/);
             if(parts.length>1){
-              addTextToPDF(doc,parts[0].trim(),DIVIDER_X+3,lineY,FONT_SIZE);
-              lineY+=LINE_H;
-              addTextToPDF(doc,'（'+parts.slice(1).join('（').replace(/）.*$/,'）'),DIVIDER_X+3,lineY,FONT_SIZE);
-              lineY+=LINE_H+2;
+              lineY=addWrappedTextToPDF(doc,parts[0].trim(),DIVIDER_X+3,lineY,FONT_SIZE,MAX_W,LINE_H);
+              lineY=addWrappedTextToPDF(doc,'（'+parts.slice(1).join('（').replace(/）.*$/,'）'),DIVIDER_X+3,lineY,FONT_SIZE,MAX_W,LINE_H);
+              lineY+=2;
             } else {
-              addTextToPDF(doc,line.trim(),DIVIDER_X+3,lineY,FONT_SIZE);
-              lineY+=LINE_H+2;
+              lineY=addWrappedTextToPDF(doc,line.trim(),DIVIDER_X+3,lineY,FONT_SIZE,MAX_W,LINE_H);
+              lineY+=2;
             }
           });
         }
