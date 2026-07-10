@@ -177,7 +177,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 <div class="tab-header">
   <div class="tab-top">
     <div class="logo">📷</div>
-    <div class="app-title">写真集作成ツール</div>
+    <div class="app-title">写真集作成ツール <span style="font-size:10px;color:var(--text2);font-weight:400;">v9.2</span></div>
   </div>
   <div class="tab-bar">
     <button class="tab-btn active" id="tab-genba" onclick="switchTab('genba')">🏗️ 現場写真集（杭打ち）</button>
@@ -615,20 +615,21 @@ function addTextToPDF(doc,text,x,y,fontSize){
 // PDF用画像圧縮（長辺maxPx・品質q に再エンコードしてファイルサイズ削減）
 function compressForPDF(src, maxPx=1000, q=0.5){
   return new Promise(res=>{
-    const timer=setTimeout(()=>res(src),8000);
+    const timer=setTimeout(()=>{ console.warn('compressForPDF timeout'); res(src); },8000);
     const img=new Image();
     img.onload=()=>{
       try{
         const ratio=Math.min(maxPx/img.width, maxPx/img.height, 1);
-        const cw=Math.round(img.width*ratio), ch=Math.round(img.height*ratio);
+        const cw=Math.max(1,Math.round(img.width*ratio));
+        const ch=Math.max(1,Math.round(img.height*ratio));
         const c=document.createElement('canvas');
         c.width=cw; c.height=ch;
         c.getContext('2d').drawImage(img,0,0,cw,ch);
-        requestAnimationFrame(()=>{
-          try{ const d=c.toDataURL('image/jpeg',q); clearTimeout(timer); res(d); }
-          catch(e){ clearTimeout(timer); res(src); }
-        });
-      }catch(e){ clearTimeout(timer); res(src); }
+        // drawImageは同期処理のため直接toDataURLで確実に圧縮
+        const d=c.toDataURL('image/jpeg',q);
+        clearTimeout(timer);
+        res(d);
+      }catch(e){ console.warn('compressForPDF error:',e); clearTimeout(timer); res(src); }
     };
     img.onerror=()=>{ clearTimeout(timer); res(src); };
     img.src=src;
@@ -1136,7 +1137,15 @@ async function generatePDF(sortMode='screen'){
       let dW=CW,dH=dW/asp;if(dH>imgH){dH=imgH;dW=dH*asp;}
       doc.addImage(src,'JPEG',ML+(CW-dW)/2,yImg+(imgH-dH)/2,dW,dH);
     }
-    doc.save(`現場写真集_${fieldName.slice(0,20)}.pdf`);
+    {
+      const blob=doc.output('blob');
+      const sizeMB=(blob.size/1048576).toFixed(1);
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url; a.download=`現場写真集_${fieldName.slice(0,20)}.pdf`; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),3000);
+      showToast(`PDFを保存しました（${sizeMB}MB）`);
+    }
     showToast('PDFを保存しました！');
   }catch(err){console.error(err);showToast('エラー: '+err.message);}
   finally{hideProgress();}
@@ -1744,7 +1753,15 @@ async function sGeneratePDF(){
       doc.text(`- ${pg+1} -`,PW/2,PH-3,{align:'center'});
     }
     const fname=(bukken.replace(/[^\w\u3040-\u9FFF\u4E00-\u9FFF]/g,'_').substring(0,25))||'測量写真集';
-    doc.save(`${fname}_測量写真集.pdf`);
+    {
+      const blob=doc.output('blob');
+      const sizeMB=(blob.size/1048576).toFixed(1);
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url; a.download=`${fname}_測量写真集.pdf`; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),3000);
+      showToast(`PDFを保存しました（${sizeMB}MB）`);
+    }
     showToast('PDFを保存しました！');
   }catch(err){
     console.error('PDF生成エラー:',err);
