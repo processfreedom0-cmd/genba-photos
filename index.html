@@ -1131,7 +1131,7 @@ async function generatePDF(sortMode='screen'){
       addTextToPDF(doc,capText,ML,yTop+8,20);
       doc.setDrawColor(180,180,180);doc.setLineWidth(0.3);doc.rect(ML,yImg,CW,imgH);
       const rawSrc=await getPhotoSrc_g(p,isKinkei(i));
-      const src=await compressForPDF(rawSrc,1000,0.5); // ファイルサイズ削減
+      const src=await compressForPDF(rawSrc,850,0.35); // ファイルサイズ削減
       const pr=doc.getImageProperties(src);const asp=pr.width/pr.height;
       let dW=CW,dH=dW/asp;if(dH>imgH){dH=imgH;dW=dH*asp;}
       doc.addImage(src,'JPEG',ML+(CW-dW)/2,yImg+(imgH-dH)/2,dW,dH);
@@ -1153,7 +1153,7 @@ const S_CATS = [
   { id:'adj',     label:'隣接地',       order:3, subs:[{key:'dir',  ph:'東・西・南・北', type:'dir'}] },
   { id:'kbm',     label:'KBM',          order:4, subs:[{key:'type', ph:'マンホール・桝・消火栓等'}] },
   { id:'border',  label:'境界ライン',   order:5, subs:[{key:'dir',  ph:'東・西・南・北', type:'dir'},{key:'pts', ph:'K1→K2 など'}] },
-  { id:'encr',    label:'越境物',       order:6, subs:[{key:'type', ph:'内容を入力'}] },
+  { id:'encr',    label:'越境物',       order:6, subs:[{key:'type', ph:'内容を入力（改行で箇条書き）', type:'multi'}] },
   { id:'bpt_near',label:'境界点近景',   order:7, subs:[{key:'pt',   ph:'点名を入力'}] },
   { id:'bpt_far', label:'境界点遠景',   order:8, subs:[{key:'pt',   ph:'点名を入力'}] },
   { id:'other',   label:'その他',       order:9, subs:[{key:'type', ph:'内容を入力'}] },
@@ -1331,6 +1331,25 @@ function sRenderCatRow(p){
   const DIR_OPTIONS=['','東側','西側','南側','北側'];
   cat.subs.forEach(s=>{
     let inp;
+    if(s.type==='multi'){
+      // 複数行入力（箇条書き用）
+      inp=document.createElement('textarea');
+      inp.className='cat-sub-input';
+      inp.placeholder=s.ph;
+      inp.rows=2;
+      inp.style.cssText='resize:vertical;min-height:44px;line-height:1.5;';
+      inp.value=(photo.catSubs&&photo.catSubs[s.key])||'';
+      inp.oninput=()=>{
+        const target=sPhotos.find(x=>x.id===photo.id);
+        if(!photo.catSubs)photo.catSubs={};
+        photo.catSubs[s.key]=inp.value;
+        if(target){ if(!target.catSubs)target.catSubs={}; target.catSubs[s.key]=inp.value; }
+        clearTimeout(window._sAutoSaveTimer);
+        window._sAutoSaveTimer=setTimeout(sAutosave,1500);
+      };
+      row.appendChild(inp);
+      return;
+    }
     if(s.type==='dir'){
       // 方角プルダウン
       inp=document.createElement('select');
@@ -1674,33 +1693,47 @@ async function sGeneratePDF(){
         // 各写真処理の間に少し待機してブラウザを安定させる
         await new Promise(r=>setTimeout(r,30));
         const rawSrc=await getSokuryouSrc(p);
-        const src=await compressForPDF(rawSrc,1000,0.5); // ファイルサイズ削減
+        const src=await compressForPDF(rawSrc,850,0.35); // ファイルサイズ削減
         const pr=doc.getImageProperties(src);const asp=pr.width/pr.height;
         let dW=photoMaxW,dH=dW/asp;if(dH>photoMaxH){dH=photoMaxH;dW=dH*asp;}
         doc.addImage(src,'JPEG',ML,slotY+(photoMaxH-dH)/2,dW,dH);
         // カテゴリーラベルを先頭に自動出力（改行・折り返し対応）
         {
-          const catLabel=sCatLabel(p);
-          const bikoLines=(p.biko||'').split('\n').filter(l=>l.trim());
-          const filtered=bikoLines.filter(l=>!S_CATS.some(c=>l.startsWith(c.label)));
-          const allLines=[catLabel,...filtered];
           const FONT_SIZE=15;
           const LINE_H=9;
           const MAX_W=BIKO_W-6;
           let lineY=slotY+10;
-          // カテゴリーラベルは「（」で改行し、長い文字は列幅で自動折り返し
-          allLines.forEach((line,li)=>{
-            if(!line.trim())return;
-            const parts=line.split(/[（(]/);
-            if(parts.length>1){
-              lineY=addWrappedTextToPDF(doc,parts[0].trim(),DIVIDER_X+3,lineY,FONT_SIZE,MAX_W,LINE_H);
-              lineY=addWrappedTextToPDF(doc,'（'+parts.slice(1).join('（').replace(/）.*$/,'）'),DIVIDER_X+3,lineY,FONT_SIZE,MAX_W,LINE_H);
-              lineY+=2;
-            } else {
+          const bikoLines=(p.biko||'').split('\n').filter(l=>l.trim());
+          const filtered=bikoLines.filter(l=>!S_CATS.some(c=>l.startsWith(c.label)));
+          if(p.catId==='encr'){
+            // 越境物：箇条書き表示
+            lineY=addWrappedTextToPDF(doc,'越境物',DIVIDER_X+3,lineY,FONT_SIZE,MAX_W,LINE_H);
+            const items=((p.catSubs&&p.catSubs.type)||'').split('\n').filter(l=>l.trim());
+            items.forEach(item=>{
+              lineY=addWrappedTextToPDF(doc,'・'+item.trim(),DIVIDER_X+3,lineY,FONT_SIZE,MAX_W,LINE_H);
+            });
+            lineY+=2;
+            filtered.forEach(line=>{
               lineY=addWrappedTextToPDF(doc,line.trim(),DIVIDER_X+3,lineY,FONT_SIZE,MAX_W,LINE_H);
               lineY+=2;
-            }
-          });
+            });
+          } else {
+            const catLabel=sCatLabel(p);
+            const allLines=[catLabel,...filtered];
+            // カテゴリーラベルは「（」で改行し、長い文字は列幅で自動折り返し
+            allLines.forEach((line,li)=>{
+              if(!line.trim())return;
+              const parts=line.split(/[（(]/);
+              if(parts.length>1){
+                lineY=addWrappedTextToPDF(doc,parts[0].trim(),DIVIDER_X+3,lineY,FONT_SIZE,MAX_W,LINE_H);
+                lineY=addWrappedTextToPDF(doc,'（'+parts.slice(1).join('（').replace(/）.*$/,'）'),DIVIDER_X+3,lineY,FONT_SIZE,MAX_W,LINE_H);
+                lineY+=2;
+              } else {
+                lineY=addWrappedTextToPDF(doc,line.trim(),DIVIDER_X+3,lineY,FONT_SIZE,MAX_W,LINE_H);
+                lineY+=2;
+              }
+            });
+          }
         }
         if(s<SLOT_COUNT-1&&idx<sPhotos.length-1){
           doc.setDrawColor(200,210,225);doc.setLineWidth(0.2);
