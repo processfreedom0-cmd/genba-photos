@@ -597,22 +597,21 @@ function drawCircle(ctx,cx,cy,r,preview=false){
 // ===================== TEXT→PDF (Japanese canvas) =====================
 function addTextToPDF(doc,text,x,y,fontSize){
   if(!text)return;
-  const scale=4,DPI=96,ptToPx=DPI/72;
+  const scale=2,DPI=96,ptToPx=DPI/72;
   const fPx=fontSize*ptToPx*scale;
   const tmp=document.createElement('canvas');tmp.width=1;tmp.height=1;
   const tctx=tmp.getContext('2d');
-  tctx.font=`${fPx}px 'Noto Sans JP', sans-serif`;
+  tctx.font=fPx+"px 'Noto Sans JP', sans-serif";
   const measured=tctx.measureText(text);
   const textW=Math.ceil(measured.width)+8,textH=Math.ceil(fPx*1.4);
   const c=document.createElement('canvas');c.width=textW;c.height=textH;
   const ctx=c.getContext('2d');
-  ctx.fillStyle='#000000';ctx.font=`${fPx}px 'Noto Sans JP', sans-serif`;ctx.textBaseline='top';
+  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,textW,textH);
+  ctx.fillStyle='#000000';ctx.font=fPx+"px 'Noto Sans JP', sans-serif";ctx.textBaseline='top';
   ctx.fillText(text,2,0);
   const mmW=textW/(scale*ptToPx)*25.4/DPI,mmH=textH/(scale*ptToPx)*25.4/DPI;
-  doc.addImage(c.toDataURL('image/png'),'PNG',x,y-mmH*0.82,mmW,mmH);
+  doc.addImage(c.toDataURL('image/jpeg',0.85),'JPEG',x,y-mmH*0.82,mmW,mmH);
 }
-
-// PDF用画像圧縮（長辺maxPx・品質q に再エンコードしてファイルサイズ削減）
 function compressForPDF(src, maxPx=1000, q=0.5){
   return new Promise(res=>{
     const timer=setTimeout(()=>{ console.warn('compressForPDF timeout'); res(src); },8000);
