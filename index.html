@@ -177,7 +177,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 <div class="tab-header">
   <div class="tab-top">
     <div class="logo">📷</div>
-    <div class="app-title">写真集作成ツール <span style="font-size:10px;color:var(--text2);font-weight:400;">v9.2</span></div>
+    <div class="app-title">写真集作成ツール <span style="font-size:10px;color:var(--text2);font-weight:400;">v9.3</span></div>
   </div>
   <div class="tab-bar">
     <button class="tab-btn active" id="tab-genba" onclick="switchTab('genba')">🏗️ 現場写真集（杭打ち）</button>
@@ -1079,14 +1079,25 @@ function clearCircles(id){const p=photos.find(x=>x.id===id);if(p){p.circles=[];r
 async function getPhotoSrc_g(p,kinkei){
   if(kinkei)return p.src;
   if(!p.circles||!p.circles.length)return p.src;
-  const canvas=document.getElementById('canvas_'+p.id);
-  if(canvas&&canvasState[p.id])return canvas.toDataURL('image/jpeg',0.50);
+  // 常にオフスクリーンキャンバスで描画（画面上のキャンバスは
+  // ブラウザに内容を破棄されることがあり黒画像の原因になるため参照しない）
   return new Promise(res=>{
-    const img=new Image();img.onload=()=>{
-      const oc=document.createElement('canvas');oc.width=img.width;oc.height=img.height;
-      const ctx=oc.getContext('2d');ctx.drawImage(img,0,0);
-      (p.circles||[]).forEach(c=>drawCircle(ctx,c.cx,c.cy,c.r));res(oc.toDataURL('image/jpeg',0.50));
-    };img.src=p.src;
+    const timer=setTimeout(()=>{ console.warn('getPhotoSrc_g timeout:',p.id); res(p.src); },8000);
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const oc=document.createElement('canvas');
+        oc.width=img.width; oc.height=img.height;
+        const ctx=oc.getContext('2d');
+        ctx.drawImage(img,0,0);
+        (p.circles||[]).forEach(c=>drawCircle(ctx,c.cx,c.cy,c.r));
+        const d=oc.toDataURL('image/jpeg',0.50);
+        clearTimeout(timer);
+        res(d);
+      }catch(e){ console.warn('getPhotoSrc_g error:',e); clearTimeout(timer); res(p.src); }
+    };
+    img.onerror=()=>{ clearTimeout(timer); res(p.src); };
+    img.src=p.src;
   });
 }
 
