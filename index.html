@@ -1700,7 +1700,6 @@ async function sGeneratePDF(){
       if(pg>0)doc.addPage();
       showProgress(`PDF生成中... (${pg+1}/${pageCount}ページ)`);
       addTextToPDF(doc,bukken,ML,MT+9,18);
-      addTextToPDF(doc,'撮影箇所',DIVIDER_X+3,MT+9,16);
       doc.setDrawColor(30,40,70);doc.setLineWidth(0.5);doc.line(ML,MT+HEADER_H,PW-MR,MT+HEADER_H);
       doc.setDrawColor(160,170,190);doc.setLineWidth(0.3);doc.line(DIVIDER_X,MT+HEADER_H,DIVIDER_X,PH-MB);
       const startIdx=pg*SLOT_COUNT;
