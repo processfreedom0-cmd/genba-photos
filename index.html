@@ -94,6 +94,7 @@ canvas.mode-move.grabbing{cursor:grabbing;}
 .canvas-toolbar{display:flex;flex-direction:column;gap:8px;padding:10px 12px;background:var(--surface);border-top:1px solid var(--border);}
 .mode-btns{display:flex;gap:6px;width:100%;}
 .mode-btn{flex:1;padding:10px 4px;border-radius:8px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .15s;text-align:center;}
+.mode-btn[id*="erase"].active{background:#c0392b !important;border-color:#c0392b !important;color:#fff !important;}
 .mode-btn.active{background:var(--accent);color:white;border-color:var(--accent);}
 .size-wrap{display:flex;align-items:center;gap:8px;width:100%;}
 .size-wrap label{font-size:11px;color:var(--text2);white-space:nowrap;}
@@ -177,7 +178,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 <div class="tab-header">
   <div class="tab-top">
     <div class="logo">📷</div>
-    <div class="app-title">写真集作成ツール <span style="font-size:10px;color:var(--text2);font-weight:400;">v9.3</span></div>
+    <div class="app-title">写真集作成ツール <span style="font-size:10px;color:var(--text2);font-weight:400;">v9.5</span></div>
   </div>
   <div class="tab-bar">
     <button class="tab-btn active" id="tab-genba" onclick="switchTab('genba')">🏗️ 現場写真集（杭打ち）</button>
@@ -269,6 +270,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
       <button class="mode-btn active" id="zoom-btn-draw" onclick="zoomSetMode('draw')">✏️ 描く</button>
       <button class="mode-btn" id="zoom-btn-move" onclick="zoomSetMode('move')">✋ 移動</button>
       <button class="mode-btn" id="zoom-btn-sel" onclick="zoomSetMode('select')" style="display:none">☞ 選択</button>
+      <button class="mode-btn" id="zoom-btn-erase" onclick="zoomSetMode('erase')">✂ 削除</button>
     </div>
     <div class="size-wrap" style="min-width:100px;flex:1;">
       <label>サイズ</label>
@@ -597,21 +599,22 @@ function drawCircle(ctx,cx,cy,r,preview=false){
 // ===================== TEXT→PDF (Japanese canvas) =====================
 function addTextToPDF(doc,text,x,y,fontSize){
   if(!text)return;
-  const scale=2,DPI=96,ptToPx=DPI/72;
+  const scale=4,DPI=96,ptToPx=DPI/72;
   const fPx=fontSize*ptToPx*scale;
   const tmp=document.createElement('canvas');tmp.width=1;tmp.height=1;
   const tctx=tmp.getContext('2d');
-  tctx.font=fPx+"px 'Noto Sans JP', sans-serif";
+  tctx.font=`${fPx}px 'Noto Sans JP', sans-serif`;
   const measured=tctx.measureText(text);
   const textW=Math.ceil(measured.width)+8,textH=Math.ceil(fPx*1.4);
   const c=document.createElement('canvas');c.width=textW;c.height=textH;
   const ctx=c.getContext('2d');
-  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,textW,textH);
-  ctx.fillStyle='#000000';ctx.font=fPx+"px 'Noto Sans JP', sans-serif";ctx.textBaseline='top';
+  ctx.fillStyle='#000000';ctx.font=`${fPx}px 'Noto Sans JP', sans-serif`;ctx.textBaseline='top';
   ctx.fillText(text,2,0);
   const mmW=textW/(scale*ptToPx)*25.4/DPI,mmH=textH/(scale*ptToPx)*25.4/DPI;
-  doc.addImage(c.toDataURL('image/jpeg',0.85),'JPEG',x,y-mmH*0.82,mmW,mmH);
+  doc.addImage(c.toDataURL('image/png'),'PNG',x,y-mmH*0.82,mmW,mmH);
 }
+
+// PDF用画像圧縮（長辺maxPx・品質q に再エンコードしてファイルサイズ削減）
 function compressForPDF(src, maxPx=1000, q=0.5){
   return new Promise(res=>{
     const timer=setTimeout(()=>{ console.warn('compressForPDF timeout'); res(src); },8000);
@@ -928,6 +931,7 @@ function renderAll(){
              <div class="mode-btns">
                <button class="mode-btn active" id="btn_draw_${p.id}" onclick="setMode('${p.id}','draw')">✏️ 描く</button>
                <button class="mode-btn" id="btn_move_${p.id}" onclick="setMode('${p.id}','move')">✋ 移動</button>
+               <button class="mode-btn" id="btn_erase_${p.id}" onclick="setMode('${p.id}','erase')">✂ 削除</button>
              </div>
              <div class="size-wrap"><label>サイズ</label><input type="range" id="size_${p.id}" min="6" max="120" value="12"></div>
              <button class="btn btn-secondary" onclick="undoCircle('${p.id}')">↩</button>
@@ -1005,10 +1009,14 @@ function applyNumMove(){
 // モード切替
 function setMode(id,mode){
   const s=canvasState[id];if(!s)return;s.mode=mode;
+  s.selectedIdx=-1;
   const canvas=document.getElementById('canvas_'+id);
   canvas.className=mode==='move'?'mode-move':'mode-draw';
   document.getElementById('btn_draw_'+id).classList.toggle('active',mode==='draw');
   document.getElementById('btn_move_'+id).classList.toggle('active',mode==='move');
+  const be=document.getElementById('btn_erase_'+id);
+  if(be) be.classList.toggle('active',mode==='erase');
+  redrawCanvas_g(id);
 }
 
 // キャンバス（現場）
@@ -1023,7 +1031,8 @@ function initCanvas(id){
     const dW=wrap.offsetWidth||(window.innerWidth-28);
     canvas.style.width=dW+'px';canvas.style.height=Math.round(dW*H/W)+'px';
     const ctx=canvas.getContext('2d');
-    canvasState[id]={img,ctx,W,H,mode:'draw',drawing:false,sx:0,sy:0,dragIdx:-1,dragOffX:0,dragOffY:0};
+    const prevG=canvasState[id]||{};
+    canvasState[id]={img,ctx,W,H,mode:prevG.mode||'draw',drawing:false,sx:0,sy:0,dragIdx:-1,dragOffX:0,dragOffY:0,selectedIdx:prevG.selectedIdx!==undefined?prevG.selectedIdx:-1};
     redrawCanvas_g(id);
     canvas.addEventListener('mousedown',e=>onStart_g(e,id,canvas));
     canvas.addEventListener('mousemove',e=>onMove_g(e,id,canvas));
@@ -1036,6 +1045,19 @@ function initCanvas(id){
 }
 function onStart_g(e,id,canvas){
   const s=canvasState[id];if(!s)return;const pt=gp(e,canvas);
+  if(s.mode==='erase'){
+    // 削除モード：タップした位置の赤丸を即削除
+    const ph=photos.find(x=>x.id===id);
+    let minD=Infinity,minI=-1;
+    (ph.circles||[]).forEach((c,i)=>{const d=Math.hypot(pt.x-c.cx,pt.y-c.cy);if(d<minD){minD=d;minI=i;}});
+    if(minI>=0){
+      ph.circles.splice(minI,1);
+      redrawCanvas_g(id);
+      showToast('赤丸を削除しました');
+      clearTimeout(window._gAutoSaveTimer);window._gAutoSaveTimer=setTimeout(gAutosave,1000);
+    }
+    return;
+  }
   if(s.mode==='draw'){s.drawing=true;s.sx=pt.x;s.sy=pt.y;}
   else{
     const ph=photos.find(x=>x.id===id);
@@ -1048,6 +1070,8 @@ function onStart_g(e,id,canvas){
       s.dragOffX=pt.x-ph.circles[minI].cx;
       s.dragOffY=pt.y-ph.circles[minI].cy;
       canvas.classList.add('grabbing');
+      s.selectedIdx=minI; // 選択削除用に記憶
+      redrawCanvas_g(id);
     }
   }
 }
@@ -1070,9 +1094,48 @@ function redrawCanvas_g(id){
   const s=canvasState[id];if(!s)return;
   const p=photos.find(x=>x.id===id);
   s.ctx.clearRect(0,0,s.W,s.H);s.ctx.drawImage(s.img,0,0);
-  (p.circles||[]).forEach(c=>drawCircle(s.ctx,c.cx,c.cy,c.r));
+  const canvas=document.getElementById('canvas_'+id);
+  const dispScale=canvas?s.W/(canvas.offsetWidth||s.W):1;
+  (p.circles||[]).forEach((c,i)=>{
+    drawCircle(s.ctx,c.cx,c.cy,c.r);
+    // 選択中の赤丸を白点線でハイライト
+    if(s.selectedIdx===i){
+      const d=Math.max(6*dispScale,3);
+      s.ctx.save();
+      s.ctx.strokeStyle='rgba(255,255,255,0.9)';
+      s.ctx.lineWidth=Math.max(2*dispScale,2);
+      s.ctx.setLineDash([d,d*0.75]);
+      s.ctx.beginPath();
+      s.ctx.arc(c.cx,c.cy,Math.max(c.r,3),0,Math.PI*2);
+      s.ctx.stroke();
+      s.ctx.restore();
+    }
+  });
 }
-function undoCircle(id){const p=photos.find(x=>x.id===id);if(p&&p.circles.length){p.circles.pop();redrawCanvas_g(id);}}
+function undoCircle(id){
+  const p=photos.find(x=>x.id===id);
+  if(p&&p.circles.length){
+    p.circles.pop();
+    const s=canvasState[id];
+    if(s&&s.selectedIdx>=p.circles.length) s.selectedIdx=-1;
+    redrawCanvas_g(id);
+    clearTimeout(window._gAutoSaveTimer);window._gAutoSaveTimer=setTimeout(gAutosave,1000);
+  }
+}
+// 選択中の赤丸だけを削除
+function deleteSelectedCircle_g(id){
+  const s=canvasState[id];const p=photos.find(x=>x.id===id);
+  if(!s||!p)return;
+  if(s.selectedIdx<0||s.selectedIdx>=p.circles.length){
+    showToast('✋移動モードで消したい赤丸をタップして選んでください');
+    return;
+  }
+  p.circles.splice(s.selectedIdx,1);
+  s.selectedIdx=-1;
+  redrawCanvas_g(id);
+  showToast('赤丸を1つ削除しました');
+  clearTimeout(window._gAutoSaveTimer);window._gAutoSaveTimer=setTimeout(gAutosave,1000);
+}
 function clearCircles(id){const p=photos.find(x=>x.id===id);if(p){p.circles=[];redrawCanvas_g(id);}}
 
 async function getPhotoSrc_g(p,kinkei){
@@ -1261,6 +1324,7 @@ function sRenderAll(){
         <button class="mode-btn active" id="sbtn_draw_${p.id}" onclick="sSetMode('${p.id}','draw')">✏️ 描く</button>
         <button class="mode-btn" id="sbtn_move_${p.id}" onclick="sSetMode('${p.id}','move')">✋ 移動</button>
         <button class="mode-btn" id="sbtn_sel_${p.id}" onclick="sSetMode('${p.id}','select')">☞ 選択</button>
+        <button class="mode-btn" id="sbtn_erase_${p.id}" onclick="sSetMode('${p.id}','erase')">✂ 削除</button>
       </div>
       <div class="size-wrap"><label style="font-size:12px;color:var(--text2);white-space:nowrap;">サイズ</label><input type="range" id="ssize_${p.id}" min="6" max="120" value="12" style="flex:1;"></div>
       <div style="display:flex;gap:8px;width:100%;">
@@ -1478,6 +1542,7 @@ function sSetMode(id,mode){
   document.getElementById('sbtn_draw_'+id).classList.toggle('active',mode==='draw');
   document.getElementById('sbtn_move_'+id).classList.toggle('active',mode==='move');
   const sb=document.getElementById('sbtn_sel_'+id);if(sb)sb.classList.toggle('active',mode==='select');
+  const se=document.getElementById('sbtn_erase_'+id);if(se)se.classList.toggle('active',mode==='erase');
   sRedraw(id);
 }
 function sDeselect(id){
@@ -1488,6 +1553,20 @@ function sDeselect(id){
 
 function sOnStart(e,id,canvas){
   const s=sCanvasState[id];if(!s)return;const pt=gp(e,canvas);
+  if(s.mode==='erase'){
+    // 削除モード：タップした位置の赤丸を即削除
+    const ph=sPhotos.find(x=>x.id===id);
+    let minD=Infinity,minI=-1;
+    (ph.circles||[]).forEach((c,i)=>{const d=Math.hypot(pt.x-c.cx,pt.y-c.cy);if(d<minD){minD=d;minI=i;}});
+    if(minI>=0){
+      ph.circles.splice(minI,1);
+      s.selectedIdx=-1; s.handleMode=null;
+      sRedraw(id);
+      showToast('赤丸を削除しました');
+      clearTimeout(window._sAutoSaveTimer);window._sAutoSaveTimer=setTimeout(sAutosave,1000);
+    }
+    return;
+  }
   if(s.mode==='draw'){s.drawing=true;s.sx=pt.x;s.sy=pt.y;}
   else if(s.mode==='select'){
     const p=sPhotos.find(x=>x.id===id);
@@ -1531,6 +1610,8 @@ function sOnStart(e,id,canvas){
       s.dragOffX=pt.x-p.circles[minI].cx;
       s.dragOffY=pt.y-p.circles[minI].cy;
       canvas.classList.add('grabbing');
+      s.selectedIdx=minI; // 選択削除用に記憶
+      sRedraw(id);
     }
   }
 }
@@ -1632,7 +1713,31 @@ function sRedraw(id){
     }
   });
 }
-function sUndoCircle(id){const p=sPhotos.find(x=>x.id===id);if(p&&p.circles.length){p.circles.pop();sRedraw(id);}}
+function sUndoCircle(id){
+  const p=sPhotos.find(x=>x.id===id);
+  if(p&&p.circles.length){
+    p.circles.pop();
+    const s=sCanvasState[id];
+    if(s&&s.selectedIdx>=p.circles.length) s.selectedIdx=-1;
+    sRedraw(id);
+    clearTimeout(window._sAutoSaveTimer);window._sAutoSaveTimer=setTimeout(sAutosave,1000);
+  }
+}
+// 選択中の赤丸だけを削除（☞選択モードまたは✋移動モードで選択）
+function sDeleteSelectedCircle(id){
+  const s=sCanvasState[id];const p=sPhotos.find(x=>x.id===id);
+  if(!s||!p)return;
+  if(s.selectedIdx<0||s.selectedIdx>=p.circles.length){
+    showToast('☞選択モードで消したい赤丸をタップして選んでください');
+    return;
+  }
+  p.circles.splice(s.selectedIdx,1);
+  s.selectedIdx=-1;
+  s.handleMode=null;
+  sRedraw(id);
+  showToast('赤丸を1つ削除しました');
+  clearTimeout(window._sAutoSaveTimer);window._sAutoSaveTimer=setTimeout(sAutosave,1000);
+}
 function sClearCircles(id){const p=sPhotos.find(x=>x.id===id);if(p){p.circles=[];sRedraw(id);}}
 
 async function getSokuryouSrc(p){
@@ -1700,6 +1805,7 @@ async function sGeneratePDF(){
       if(pg>0)doc.addPage();
       showProgress(`PDF生成中... (${pg+1}/${pageCount}ページ)`);
       addTextToPDF(doc,bukken,ML,MT+9,18);
+      addTextToPDF(doc,'撮影箇所',DIVIDER_X+3,MT+9,16);
       doc.setDrawColor(30,40,70);doc.setLineWidth(0.5);doc.line(ML,MT+HEADER_H,PW-MR,MT+HEADER_H);
       doc.setDrawColor(160,170,190);doc.setLineWidth(0.3);doc.line(DIVIDER_X,MT+HEADER_H,DIVIDER_X,PH-MB);
       const startIdx=pg*SLOT_COUNT;
@@ -1850,12 +1956,13 @@ function closeZoom() {
 function zoomSetMode(mode) {
   zoomState.mode = mode;
   const canvas = document.getElementById('zoomCanvas');
-  canvas.className = mode==='move'||(mode==='select') ? 'mode-move' : 'mode-draw';
-  ['draw','move','sel'].forEach(m => {
-    const b=document.getElementById('zoom-btn-'+m);
-    if(b) b.classList.toggle('active', m===mode);
-  });
-  if(mode!=='select'){ zoomState.selectedIdx=-1; zoomRedraw(); }
+  canvas.className = (mode==='move'||mode==='select') ? 'mode-move' : 'mode-draw';
+  document.getElementById('zoom-btn-draw').classList.toggle('active', mode==='draw');
+  document.getElementById('zoom-btn-move').classList.toggle('active', mode==='move');
+  const bs=document.getElementById('zoom-btn-sel'); if(bs) bs.classList.toggle('active', mode==='select');
+  const be=document.getElementById('zoom-btn-erase'); if(be) be.classList.toggle('active', mode==='erase');
+  if(mode!=='select'){ zoomState.selectedIdx=-1; }
+  zoomRedraw();
 }
 
 function zoomGetPhoto() {
@@ -1874,6 +1981,16 @@ function zoomRedraw() {
   (p.circles||[]).forEach((c,i) => {
     if(zoomMode_str==='g'){
       drawCircle(ctx,c.cx,c.cy,c.r);
+      if(zoomState.selectedIdx===i){
+        const zD=zoomState.W/(canvas.offsetWidth||zoomState.W);
+        const dash=Math.max(6*zD,3);
+        ctx.save();
+        ctx.strokeStyle='rgba(255,255,255,0.9)';
+        ctx.lineWidth=Math.max(2*zD,2);
+        ctx.setLineDash([dash,dash*0.75]);
+        ctx.beginPath();ctx.arc(c.cx,c.cy,Math.max(c.r,3),0,Math.PI*2);
+        ctx.stroke();ctx.restore();
+      }
     } else {
       const rx=c.rx!==undefined?c.rx:c.r;
       const ry=c.ry!==undefined?c.ry:c.r;
@@ -1901,6 +2018,18 @@ function zoomOnStart(e, canvas) {
   const pt = gp(e, canvas);
   const p  = zoomGetPhoto(); if(!p) return;
   const st = zoomState;
+  if(st.mode==='erase'){
+    // 削除モード：タップした位置の赤丸を即削除
+    let minD=Infinity,minI=-1;
+    (p.circles||[]).forEach((c,i)=>{const d=Math.hypot(pt.x-c.cx,pt.y-c.cy);if(d<minD){minD=d;minI=i;}});
+    if(minI>=0){
+      p.circles.splice(minI,1);
+      st.selectedIdx=-1; st.handleMode=null;
+      zoomRedraw();
+      showToast('赤丸を削除しました');
+    }
+    return;
+  }
   if(st.mode==='draw'){ st.drawing=true; st.sx=pt.x; st.sy=pt.y; }
   else if(st.mode==='select'){
     if(st.selectedIdx>=0){
@@ -1927,6 +2056,8 @@ function zoomOnStart(e, canvas) {
       // タップ点と楕円中心の距離差を保持
       st.dragOffX=pt.x-p.circles[minI].cx;
       st.dragOffY=pt.y-p.circles[minI].cy;
+      st.selectedIdx=minI; // 選択削除用に記憶
+      zoomRedraw();
     }
   }
 }
@@ -1976,7 +2107,22 @@ function zoomOnEnd(e, canvas) {
 }
 function zoomUndo(){
   const p=zoomGetPhoto(); if(!p||!p.circles.length)return;
-  p.circles.pop(); zoomRedraw();
+  p.circles.pop();
+  if(zoomState.selectedIdx>=p.circles.length) zoomState.selectedIdx=-1;
+  zoomRedraw();
+}
+// 拡大モーダル：選択中の赤丸だけ削除
+function zoomDeleteSelected(){
+  const p=zoomGetPhoto(); if(!p)return;
+  const st=zoomState;
+  if(st.selectedIdx<0||st.selectedIdx>=p.circles.length){
+    showToast('消したい赤丸をタップして選んでください');
+    return;
+  }
+  p.circles.splice(st.selectedIdx,1);
+  st.selectedIdx=-1; st.handleMode=null;
+  zoomRedraw();
+  showToast('赤丸を1つ削除しました');
 }
 function zoomClear(){
   const p=zoomGetPhoto(); if(!p)return;
