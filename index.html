@@ -39,6 +39,8 @@ input[type="text"]::placeholder{color:var(--text2);}
 .upload-area{border:2px dashed var(--border);border-radius:var(--radius);padding:24px 16px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;}
 .upload-area:hover{border-color:var(--accent2);background:rgba(245,166,35,.05);}
 .upload-area.blue:hover{border-color:var(--accent3);background:rgba(74,158,255,.05);}
+.upload-area.dragover{border-style:solid;border-color:var(--accent2);background:rgba(245,166,35,.14);transform:scale(1.01);}
+.upload-area.blue.dragover{border-color:var(--accent3);background:rgba(74,158,255,.14);}
 .upload-area .icon{font-size:32px;margin-bottom:6px;}
 .upload-area p{font-size:14px;color:var(--text2);}
 .upload-area strong{color:var(--accent2);}
@@ -178,7 +180,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 <div class="tab-header">
   <div class="tab-top">
     <div class="logo">📷</div>
-    <div class="app-title">写真集作成ツール <span style="font-size:10px;color:var(--text2);font-weight:400;">v9.5</span></div>
+    <div class="app-title">写真集作成ツール <span style="font-size:10px;color:var(--text2);font-weight:400;">v9.6</span></div>
   </div>
   <div class="tab-bar">
     <button class="tab-btn active" id="tab-genba" onclick="switchTab('genba')">🏗️ 現場写真集（杭打ち）</button>
@@ -204,6 +206,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
       <div class="icon">🖼️</div>
       <p><strong>タップして写真を選択</strong></p>
       <p>近景→遠景の順に追加してください</p>
+      <p class="drop-hint" style="font-size:12px;margin-top:4px;opacity:.75;">写真をここにドラッグ＆ドロップでも追加できます</p>
     </div>
     <input type="file" id="fileInput" accept="image/*" multiple class="file-input-hidden">
     <div class="photo-list" id="photoList"><div class="empty-state">写真を追加してください</div></div>
@@ -239,6 +242,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
       <div class="icon">🗾</div>
       <p><strong>タップして写真を選択</strong></p>
       <p>写真を追加→各写真に備考を入力してください</p>
+      <p class="drop-hint" style="font-size:12px;margin-top:4px;opacity:.75;">写真をここにドラッグ＆ドロップでも追加できます</p>
     </div>
     <input type="file" id="s-fileInput" accept="image/*" multiple class="file-input-hidden">
     <div class="photo-list" id="s-photoList"><div class="empty-state">写真を追加してください</div></div>
@@ -2183,6 +2187,52 @@ function onWindowResize(){
 window.addEventListener('orientationchange',()=>setTimeout(onWindowResize,300));
 window.addEventListener('resize',()=>{ clearTimeout(window._resizeTimer); window._resizeTimer=setTimeout(onWindowResize,200); });
 
+
+// =========================================================
+//  ドラッグ＆ドロップで写真追加（PC向け）
+// =========================================================
+function setupDropZone(areaId, handler){
+  const area = document.getElementById(areaId);
+  if(!area) return;
+  ['dragenter','dragover'].forEach(ev=>{
+    area.addEventListener(ev, e=>{
+      e.preventDefault(); e.stopPropagation();
+      if(e.dataTransfer) e.dataTransfer.dropEffect='copy';
+      area.classList.add('dragover');
+    });
+  });
+  ['dragleave','dragend'].forEach(ev=>{
+    area.addEventListener(ev, e=>{
+      e.preventDefault(); e.stopPropagation();
+      // 子要素間の移動では解除しない
+      if(ev==='dragleave' && area.contains(e.relatedTarget)) return;
+      area.classList.remove('dragover');
+    });
+  });
+  area.addEventListener('drop', e=>{
+    e.preventDefault(); e.stopPropagation();
+    area.classList.remove('dragover');
+    const dt = e.dataTransfer;
+    if(!dt) return;
+    const files = Array.from(dt.files||[]).filter(f=>f.type.startsWith('image/'));
+    if(!files.length){ showToast('画像ファイルをドロップしてください'); return; }
+    handler(files);
+    showToast(files.length + '枚を追加しています…');
+  });
+}
+
+// エリア外にドロップした際にブラウザが画像を開いてしまうのを防止
+// （編集中データの消失を防ぐため）
+['dragover','drop'].forEach(ev=>{
+  window.addEventListener(ev, e=>{
+    if(e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('Files')){
+      e.preventDefault();
+    }
+  }, false);
+});
+
+setupDropZone('uploadArea', handleFiles);
+setupDropZone('s-uploadArea', sHandleFiles);
 </script>
 </body>
 </html>
