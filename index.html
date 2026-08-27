@@ -32,14 +32,13 @@
 body{background:var(--bg);color:var(--text);font-family:'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;min-height:100vh;padding-bottom:100px;}
 
 /* ===== TABS ===== */
-.tab-header{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
+.tab-header{background:var(--bg);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
 .tab-header::before{content:'';display:block;height:3px;background:linear-gradient(90deg,var(--orange) 0%,var(--orange) 45%,var(--navy) 55%,var(--navy) 100%);}
-.tab-top{display:flex;align-items:center;gap:10px;padding:12px 16px 0;}
-.brand-logo{height:38px;width:auto;display:block;flex-shrink:0;}
+.tab-top{display:flex;align-items:center;gap:14px;padding:10px 16px 4px;}
+.brand-logo{height:76px;width:auto;max-width:45vw;object-fit:contain;display:block;flex-shrink:0;}
 .brand-fallback{display:none;align-items:center;gap:8px;font-weight:800;color:var(--navy);letter-spacing:.06em;font-size:15px;}
 .brand-fallback .hy{color:var(--orange);}
 .app-title{font-size:15px;font-weight:700;color:var(--navy-deep);letter-spacing:.02em;}
-.app-tagline{font-size:10px;color:var(--text2);letter-spacing:.18em;margin-top:1px;}
 .tab-bar{display:flex;margin-top:10px;}
 .tab-btn{flex:1;padding:11px 8px;border:none;background:none;color:var(--text2);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;border-bottom:3px solid transparent;transition:all .2s;letter-spacing:.02em;}
 .tab-btn.active{color:var(--orange);border-bottom-color:var(--orange);}
@@ -208,7 +207,6 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
     <div class="brand-fallback" id="brandFallback"><span class="hy">HYMY</span>×<span>ORSA</span></div>
     <div>
       <div class="app-title">写真集作成ツール <span style="font-size:10px;color:var(--text2);font-weight:400;">v9.7</span></div>
-      <div class="app-tagline">境界を整え、未来を測る。</div>
     </div>
   </div>
   <div class="tab-bar">
