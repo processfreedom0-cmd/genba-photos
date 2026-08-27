@@ -10,37 +10,61 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-:root{--bg:#0f1923;--surface:#1a2535;--surface2:#243044;--accent:#e85d3a;--accent2:#f5a623;--accent3:#4a9eff;--text:#e8edf2;--text2:#8899aa;--border:#2d3f55;--radius:12px;}
+:root{
+  /* HYMY×ORSA ブランドカラー */
+  --navy:#1B3A5C;        /* ORSA ネイビー */
+  --navy-deep:#12293F;   /* 濃紺（見出し・強調） */
+  --orange:#E2661C;      /* HYMY オレンジ */
+  --orange-soft:#F08A3E;
+  --bg:#F2F0EA;          /* 生成り背景 */
+  --surface:#FFFFFF;     /* カード面 */
+  --surface2:#F7F5EF;    /* 淡いグレージュ */
+  --accent:#E2661C;      /* 杭打ち＝オレンジ */
+  --accent2:#E2661C;
+  --accent3:#1B3A5C;     /* 測量＝ネイビー */
+  --text:#1F2A36;        /* 本文（十分な濃さで可読性確保） */
+  --text2:#5E6B7A;       /* 補助テキスト */
+  --border:#D8D3C7;      /* 境界線 */
+  --radius:12px;
+  --shadow:0 1px 3px rgba(27,58,92,.08),0 1px 2px rgba(27,58,92,.06);
+}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{background:var(--bg);color:var(--text);font-family:'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;min-height:100vh;padding-bottom:100px;}
 
 /* ===== TABS ===== */
-.tab-header{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.tab-header{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
+.tab-header::before{content:'';display:block;height:3px;background:linear-gradient(90deg,var(--orange) 0%,var(--orange) 45%,var(--navy) 55%,var(--navy) 100%);}
 .tab-top{display:flex;align-items:center;gap:10px;padding:12px 16px 0;}
-.logo{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
-.app-title{font-size:15px;font-weight:700;}
+.brand-logo{height:38px;width:auto;display:block;flex-shrink:0;}
+.brand-fallback{display:none;align-items:center;gap:8px;font-weight:800;color:var(--navy);letter-spacing:.06em;font-size:15px;}
+.brand-fallback .hy{color:var(--orange);}
+.app-title{font-size:15px;font-weight:700;color:var(--navy-deep);letter-spacing:.02em;}
+.app-tagline{font-size:10px;color:var(--text2);letter-spacing:.18em;margin-top:1px;}
 .tab-bar{display:flex;margin-top:10px;}
-.tab-btn{flex:1;padding:10px 8px;border:none;background:none;color:var(--text2);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;border-bottom:3px solid transparent;transition:all .2s;letter-spacing:.02em;}
-.tab-btn.active{color:var(--accent2);border-bottom-color:var(--accent2);}
+.tab-btn{flex:1;padding:11px 8px;border:none;background:none;color:var(--text2);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;border-bottom:3px solid transparent;transition:all .2s;letter-spacing:.02em;}
+.tab-btn.active{color:var(--orange);border-bottom-color:var(--orange);}
+#tab-sokuryou.active{color:var(--navy);border-bottom-color:var(--navy);}
+.tab-btn:not(.active):hover{color:var(--text);background:rgba(27,58,92,.04);}
 .tab-btn:first-child.active{color:var(--accent);border-bottom-color:var(--accent);}
 .panel{display:none;}
 .panel.active{display:block;}
 
 main{padding:14px;max-width:640px;margin:0 auto;}
-.section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px;}
-.section-title{font-size:11px;font-weight:700;color:var(--accent2);letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px;box-shadow:var(--shadow);}
+.section-title{font-size:11px;font-weight:800;color:var(--orange);letter-spacing:.1em;margin-bottom:10px;display:flex;align-items:center;gap:7px;padding-left:9px;border-left:3px solid var(--orange);line-height:1.4;}
 .section-title::before{content:'';display:block;width:3px;height:13px;background:var(--accent2);border-radius:2px;}
-.section-title.blue{color:var(--accent3);}
+.section-title.blue{color:var(--navy);border-left-color:var(--navy);}
 .section-title.blue::before{background:var(--accent3);}
-input[type="text"]{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:15px;font-family:inherit;padding:11px 13px;outline:none;transition:border-color .2s;}
+input[type="text"]{width:100%;background:#fff;border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:15px;font-family:inherit;padding:11px 13px;outline:none;transition:border-color .2s,box-shadow .2s;}
+input[type="text"]:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(27,58,92,.10);}
 input[type="text"]:focus{border-color:var(--accent2);}
 input[type="text"]::placeholder{color:var(--text2);}
 .hint{font-size:11px;color:var(--text2);margin-top:6px;line-height:1.6;}
-.upload-area{border:2px dashed var(--border);border-radius:var(--radius);padding:24px 16px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;}
-.upload-area:hover{border-color:var(--accent2);background:rgba(245,166,35,.05);}
-.upload-area.blue:hover{border-color:var(--accent3);background:rgba(74,158,255,.05);}
-.upload-area.dragover{border-style:solid;border-color:var(--accent2);background:rgba(245,166,35,.14);transform:scale(1.01);}
-.upload-area.blue.dragover{border-color:var(--accent3);background:rgba(74,158,255,.14);}
+.upload-area{border:2px dashed #C9C2B2;background:var(--surface2);border-radius:var(--radius);padding:24px 16px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;}
+.upload-area:hover{border-color:var(--orange);background:rgba(226,102,28,.06);}
+.upload-area.blue:hover{border-color:var(--navy);background:rgba(27,58,92,.05);}
+.upload-area.dragover{border-style:solid;border-color:var(--orange);background:rgba(226,102,28,.13);transform:scale(1.01);}
+.upload-area.blue.dragover{border-color:var(--navy);background:rgba(27,58,92,.11);}
 .upload-area .icon{font-size:32px;margin-bottom:6px;}
 .upload-area p{font-size:14px;color:var(--text2);}
 .upload-area strong{color:var(--accent2);}
@@ -49,13 +73,13 @@ input[type="text"]::placeholder{color:var(--text2);}
 .photo-list{display:flex;flex-direction:column;gap:14px;margin-top:12px;}
 
 /* ===== DRAG & DROP ===== */
-.photo-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:opacity .2s, box-shadow .2s, transform .15s;}
+.photo-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);transition:opacity .2s, box-shadow .2s, transform .15s;}
 .photo-card.kinkei{border-left:4px solid var(--accent2);}
 .photo-card.enkei{border-left:4px solid var(--accent);}
 .photo-card.sokuryou-card{border-left:4px solid var(--accent3);}
 
 /* ドラッグ中のカード */
-.photo-card.dragging{opacity:0.35;box-shadow:none;transform:scale(0.98);}
+.photo-card.dragging{opacity:0.4;box-shadow:0 8px 20px rgba(27,58,92,.18);transform:scale(0.98);}
 
 /* ドロップ位置インジケーター */
 .drop-indicator{height:4px;border-radius:2px;background:var(--accent2);margin:2px 0;transition:opacity .15s;opacity:0;pointer-events:none;}
@@ -72,8 +96,8 @@ input[type="text"]::placeholder{color:var(--text2);}
 .drag-ghost{position:fixed;pointer-events:none;z-index:9999;border-radius:var(--radius);box-shadow:0 12px 40px rgba(0,0,0,.6);opacity:0.85;overflow:hidden;border:2px solid var(--accent2);}
 .drag-ghost.sokuryou{border-color:var(--accent3);}
 
-.card-header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);}
-.photo-num{background:var(--accent);color:white;border-radius:6px;width:30px;height:30px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.card-header{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface2);border-bottom:1px solid var(--border);}
+.photo-num{background:var(--accent);color:#fff;border-radius:6px;width:30px;height:30px;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.15);}
 .photo-num.kinkei{background:var(--accent2);color:#1a1000;}
 .photo-num.enkei{background:var(--accent);color:white;}
 .photo-num.sokuryou{background:var(--accent3);color:white;}
@@ -83,7 +107,7 @@ input[type="text"]::placeholder{color:var(--text2);}
 .point-input:focus{border-color:var(--accent2);}
 .point-input::placeholder{color:var(--text2);}
 .photo-delete{background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:0 2px;flex-shrink:0;}
-.photo-replace{background:rgba(74,158,255,.15);border:1px solid rgba(74,158,255,.3);color:var(--accent3);border-radius:6px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;padding:4px 8px;flex-shrink:0;white-space:nowrap;}
+.photo-replace{background:rgba(27,58,92,.07);border:1px solid rgba(27,58,92,.22);color:var(--navy);border-radius:6px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;padding:4px 8px;flex-shrink:0;white-space:nowrap;}
 .photo-replace:hover{background:rgba(74,158,255,.3);}
 .preview-wrap{width:100%;background:#000;position:relative;}
 .preview-img{width:100%;display:block;object-fit:contain;}
@@ -93,17 +117,17 @@ canvas{width:100%;display:block;touch-action:none;}
 canvas.mode-draw{cursor:crosshair;}
 canvas.mode-move{cursor:grab;}
 canvas.mode-move.grabbing{cursor:grabbing;}
-.canvas-toolbar{display:flex;flex-direction:column;gap:8px;padding:10px 12px;background:var(--surface);border-top:1px solid var(--border);}
+.canvas-toolbar{display:flex;flex-direction:column;gap:8px;padding:10px 12px;background:var(--surface2);border-top:1px solid var(--border);}
 .mode-btns{display:flex;gap:6px;width:100%;}
-.mode-btn{flex:1;padding:10px 4px;border-radius:8px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .15s;text-align:center;}
-.mode-btn[id*="erase"].active{background:#c0392b !important;border-color:#c0392b !important;color:#fff !important;}
+.mode-btn{flex:1;padding:10px 4px;border-radius:8px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;border:1.5px solid var(--border);background:#fff;color:var(--text2);transition:all .15s;text-align:center;}
+.mode-btn[id*="erase"].active{background:#C0392B !important;border-color:#C0392B !important;color:#fff !important;}
 .mode-btn.active{background:var(--accent);color:white;border-color:var(--accent);}
 .size-wrap{display:flex;align-items:center;gap:8px;width:100%;}
 .size-wrap label{font-size:11px;color:var(--text2);white-space:nowrap;}
 input[type="range"]{flex:1;accent-color:var(--accent);}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:10px 0;border-radius:8px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;border:none;white-space:nowrap;flex:1;}
 .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
-.btn-danger{background:rgba(232,93,58,.15);color:var(--accent);border:1px solid rgba(232,93,58,.3);}
+.btn-danger{background:#FDEDE8;color:#C0392B;border:1px solid #F0C4B8;}
 .empty-state{text-align:center;padding:20px;color:var(--text2);font-size:14px;}
 .count-badge{background:var(--accent);color:white;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-left:4px;}
 .count-badge.blue{background:var(--accent3);}
@@ -124,9 +148,9 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 
 /* ===== 測量：カテゴリー選択 ===== */
 .cat-row{padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
-.cat-select{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:inherit;padding:5px 8px;outline:none;cursor:pointer;flex-shrink:0;}
+.cat-select{background:#fff;border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:inherit;padding:6px 8px;outline:none;cursor:pointer;flex-shrink:0;}
 .cat-select:focus{border-color:var(--accent3);}
-.cat-sub-input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:inherit;padding:5px 8px;outline:none;flex:1;min-width:80px;}
+.cat-sub-input{background:#fff;border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:inherit;padding:6px 8px;outline:none;flex:1;min-width:80px;}
 .cat-sub-input:focus{border-color:var(--accent3);}
 .cat-sub-input::placeholder{color:var(--text2);}
 .cat-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:var(--accent3);color:#fff;margin-left:4px;flex-shrink:0;}
@@ -135,7 +159,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 /* ===== 拡大編集モーダル ===== */
 .zoom-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:400;flex-direction:column;}
 .zoom-overlay.open{display:flex;}
-.zoom-header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+.zoom-header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;box-shadow:var(--shadow);}
 .zoom-header-title{font-size:13px;font-weight:700;flex:1;}
 .zoom-canvas-area{flex:1;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:12px;}
 .zoom-canvas-area canvas{display:block;max-width:100%;touch-action:none;}
@@ -144,7 +168,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 
 /* ===== FAB ===== */
 .fab-area{position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-end;z-index:200;}
-.fab{color:white;border:none;border-radius:50px;padding:13px 20px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:7px;box-shadow:0 4px 16px rgba(0,0,0,.4);}
+.fab{color:#fff;border:none;border-radius:50px;padding:13px 20px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:7px;box-shadow:0 4px 14px rgba(27,58,92,.28);}
 .fab:active{transform:scale(.95);}
 .fab-pdf-genba{background:var(--accent);}
 .fab-pdf-sokuryou{background:var(--accent3);}
@@ -158,13 +182,13 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 .progress-overlay p{font-size:16px;color:white;}
 .spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,.2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
-.toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:50px;font-size:14px;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;white-space:nowrap;z-index:250;}
+.toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--navy-deep);border:none;color:#fff;padding:11px 22px;border-radius:50px;font-size:14px;font-weight:600;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;white-space:nowrap;z-index:250;box-shadow:0 4px 16px rgba(18,41,63,.28);}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
 /* popup */
 .popup-overlay{display:none;position:fixed;inset:0;z-index:490;}
 .popup-overlay.show{display:block;}
-.num-popup{display:none;position:fixed;z-index:500;background:var(--surface);border:2px solid var(--accent2);border-radius:10px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,.7);width:220px;}
+.num-popup{display:none;position:fixed;z-index:500;background:#fff;border:2px solid var(--orange);border-radius:10px;padding:14px;box-shadow:0 8px 28px rgba(27,58,92,.22);width:220px;}
 .num-popup.open{display:block;}
 .num-popup p{font-size:12px;color:var(--text2);margin-bottom:8px;}
 .num-popup input[type="number"]{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:20px;font-family:inherit;padding:8px;outline:none;text-align:center;-webkit-appearance:none;}
@@ -179,8 +203,13 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 <!-- TAB HEADER -->
 <div class="tab-header">
   <div class="tab-top">
-    <div class="logo">📷</div>
-    <div class="app-title">写真集作成ツール <span style="font-size:10px;color:var(--text2);font-weight:400;">v9.6</span></div>
+    <img src="logo.png" alt="HYMY × ORSA" class="brand-logo"
+         onerror="this.style.display='none';document.getElementById('brandFallback').style.display='flex';">
+    <div class="brand-fallback" id="brandFallback"><span class="hy">HYMY</span>×<span>ORSA</span></div>
+    <div>
+      <div class="app-title">写真集作成ツール <span style="font-size:10px;color:var(--text2);font-weight:400;">v9.7</span></div>
+      <div class="app-tagline">境界を整え、未来を測る。</div>
+    </div>
   </div>
   <div class="tab-bar">
     <button class="tab-btn active" id="tab-genba" onclick="switchTab('genba')">🏗️ 現場写真集（杭打ち）</button>
@@ -196,8 +225,8 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
     <input type="text" id="fieldName" placeholder="現場名（例：テスト）">
     <div class="hint" style="margin-top:8px;">📌 奇数枚目（近景）に点番号を入力 → 偶数枚目（遠景）に自動反映。編集内容は自動保存されます。<button onclick="if(confirm('保存データを消去しますか？')){gClearSaved();photos=[];pdfOrder=[];renderAll();document.getElementById('fieldName').value='';showToast('リセットしました');}" style="margin-left:8px;font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-family:inherit;">🗑 保存データ消去</button></div>
     <div style="display:flex;gap:8px;margin-top:8px;">
-      <button onclick="gSaveProject()" style="flex:1;padding:8px;border-radius:7px;border:1px solid var(--accent2);background:rgba(245,166,35,.12);color:var(--accent2);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;">💾 ファイルに保存</button>
-      <label style="flex:1;padding:8px;border-radius:7px;border:1px solid var(--accent3);background:rgba(74,158,255,.12);color:var(--accent3);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;text-align:center;display:block;">📂 ファイルから読込<input type="file" accept=".json" class="file-input-hidden" onchange="gLoadProject(this)"></label>
+      <button onclick="gSaveProject()" style="flex:1;padding:8px;border-radius:7px;border:1.5px solid var(--orange);background:rgba(226,102,28,.08);color:var(--orange);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;">💾 ファイルに保存</button>
+      <label style="flex:1;padding:8px;border-radius:7px;border:1.5px solid var(--navy);background:rgba(27,58,92,.07);color:var(--navy);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;text-align:center;display:block;">📂 ファイルから読込<input type="file" accept=".json" class="file-input-hidden" onchange="gLoadProject(this)"></label>
     </div>
   </div>
   <div class="section">
@@ -213,10 +242,10 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
   </div>
 </main>
 <div class="fab-area">
-  <button class="fab" style="background:#2a7a4a;font-size:20px;padding:10px;width:46px;height:46px;border-radius:50%;justify-content:center;" title="今すぐ保存" onclick="gAutosave().then(()=>showToast('保存しました'))">💾</button>
+  <button class="fab" style="background:#2E7D5B;font-size:20px;padding:10px;width:46px;height:46px;border-radius:50%;justify-content:center;" title="今すぐ保存" onclick="gAutosave().then(()=>showToast('保存しました'))">💾</button>
   <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
     <button class="fab fab-pdf-genba" style="font-size:13px;padding:10px 16px;" onclick="generatePDF('screen')">📄 画面順で発行</button>
-    <button class="fab" style="background:#c0550a;font-size:13px;padding:10px 16px;" onclick="generatePDF('point')">🔢 点番号順で発行</button>
+    <button class="fab" style="background:var(--navy);font-size:13px;padding:10px 16px;" onclick="generatePDF('point')">🔢 点番号順で発行</button>
   </div>
 </div>
 </div>
@@ -229,8 +258,8 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
     <input type="text" id="s-bukken" placeholder="例：大阪市淀川区加島一丁目351-4（加島158①LS）" >
     <div class="hint" style="margin-top:8px;">📌 現場名がページヘッダーに表示されます。1ページに3枚ずつ出力されます。編集内容は自動保存されます。<button onclick="if(confirm('保存データを消去しますか？')){sClearSaved();sPhotos=[];sRenderAll();}" style="margin-left:8px;font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-family:inherit;">🗑 保存データ消去</button></div>
     <div style="display:flex;gap:8px;margin-top:8px;">
-      <button onclick="sSaveProject()" style="flex:1;padding:8px;border-radius:7px;border:1px solid var(--accent2);background:rgba(245,166,35,.12);color:var(--accent2);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;">💾 ファイルに保存</button>
-      <label style="flex:1;padding:8px;border-radius:7px;border:1px solid var(--accent3);background:rgba(74,158,255,.12);color:var(--accent3);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;text-align:center;display:block;">📂 ファイルから読込<input type="file" accept=".json" class="file-input-hidden" onchange="sLoadProject(this)"></label>
+      <button onclick="sSaveProject()" style="flex:1;padding:8px;border-radius:7px;border:1.5px solid var(--orange);background:rgba(226,102,28,.08);color:var(--orange);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;">💾 ファイルに保存</button>
+      <label style="flex:1;padding:8px;border-radius:7px;border:1.5px solid var(--navy);background:rgba(27,58,92,.07);color:var(--navy);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;text-align:center;display:block;">📂 ファイルから読込<input type="file" accept=".json" class="file-input-hidden" onchange="sLoadProject(this)"></label>
     </div>
   </div>
   <div class="section">
@@ -249,7 +278,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
   </div>
 </main>
 <div class="fab-area">
-  <button class="fab" style="background:#2a7a4a;font-size:20px;padding:10px;width:46px;height:46px;border-radius:50%;justify-content:center;" title="今すぐ保存" onclick="sAutosave().then(()=>showToast('保存しました'))">💾</button>
+  <button class="fab" style="background:#2E7D5B;font-size:20px;padding:10px;width:46px;height:46px;border-radius:50%;justify-content:center;" title="今すぐ保存" onclick="sAutosave().then(()=>showToast('保存しました'))">💾</button>
   <button class="fab fab-pdf-sokuryou" onclick="sGeneratePDF()">📄 PDF出力（測量）</button>
 </div>
 </div>
