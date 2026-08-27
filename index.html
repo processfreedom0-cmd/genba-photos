@@ -34,8 +34,10 @@ body{background:var(--bg);color:var(--text);font-family:'Hiragino Kaku Gothic Pr
 /* ===== TABS ===== */
 .tab-header{background:var(--bg);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
 .tab-header::before{content:'';display:block;height:3px;background:linear-gradient(90deg,var(--orange) 0%,var(--orange) 45%,var(--navy) 55%,var(--navy) 100%);}
-.tab-top{display:flex;align-items:center;gap:14px;padding:10px 16px 4px;}
-.brand-logo{height:76px;width:auto;max-width:45vw;object-fit:contain;display:block;flex-shrink:0;}
+.tab-top{display:flex;align-items:center;gap:16px;padding:6px 16px 2px;}
+@media(max-width:600px){.tab-top{gap:10px;padding:4px 12px 2px;}.app-title{font-size:13px;}}
+.brand-logo{height:152px;width:auto;max-width:58vw;object-fit:contain;display:block;flex-shrink:0;}
+@media(max-width:600px){.brand-logo{height:84px;max-width:62vw;}}
 .brand-fallback{display:none;align-items:center;gap:8px;font-weight:800;color:var(--navy);letter-spacing:.06em;font-size:15px;}
 .brand-fallback .hy{color:var(--orange);}
 .app-title{font-size:15px;font-weight:700;color:var(--navy-deep);letter-spacing:.02em;}
