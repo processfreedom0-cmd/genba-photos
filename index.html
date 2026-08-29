@@ -199,6 +199,18 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 .fab-area{position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-end;z-index:200;}
 .fab{color:#fff;border:none;border-radius:50px;padding:13px 20px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:7px;box-shadow:0 4px 14px rgba(27,58,92,.28);}
 .fab:active{transform:scale(.95);}
+.save-status{
+  display:none; align-items:center; gap:5px;
+  padding:5px 11px; border-radius:50px;
+  background:rgba(255,255,255,.92); border:1px solid var(--border);
+  color:var(--text2); font-size:11px; font-weight:700; letter-spacing:.02em;
+  box-shadow:0 2px 8px rgba(27,58,92,.10);
+  transition:opacity .25s;
+}
+.save-status.on{display:flex;}
+.save-status.saving{color:var(--text2);}
+.save-status.saved{color:#2E7D5B; border-color:rgba(46,125,91,.35);}
+.save-status.error{color:#C0392B; border-color:rgba(192,57,43,.4); background:rgba(255,240,238,.96);}
 .fab-pdf-genba{background:var(--accent);}
 .fab-pdf-sokuryou{background:var(--accent3);}
 
@@ -238,7 +250,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
     </div>
     <div class="brand-fallback" id="brandFallback"><span class="hy">HYMY</span>×<span>ORSA</span></div>
     <div>
-      <div class="app-title">写真集作成ツール <span style="font-size:10px;color:var(--text2);font-weight:400;">v9.8</span></div>
+      <div class="app-title">写真集作成ツール <span style="font-size:10px;color:var(--text2);font-weight:400;">v9.10</span></div>
     </div>
   </div>
   <div class="tab-bar">
@@ -272,7 +284,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
   </div>
 </main>
 <div class="fab-area">
-  <button class="fab" style="background:#2E7D5B;font-size:20px;padding:10px;width:46px;height:46px;border-radius:50%;justify-content:center;" title="今すぐ保存" onclick="gAutosave().then(()=>showToast('保存しました'))">💾</button>
+  <div class="save-status" id="g-saveStatus"></div>
   <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
     <button class="fab fab-pdf-genba" style="font-size:13px;padding:10px 16px;" onclick="generatePDF('screen')">📄 画面順で発行</button>
     <button class="fab" style="background:var(--navy);font-size:13px;padding:10px 16px;" onclick="generatePDF('point')">🔢 点番号順で発行</button>
@@ -294,9 +306,6 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
   </div>
   <div class="section">
     <div class="section-title blue">写真 <span class="count-badge blue" id="s-photoCount">0</span></div>
-    <button onclick="sApplyAllCategories()" style="width:100%;margin-bottom:10px;padding:10px 16px;background:rgba(74,158,255,.15);border:1px solid rgba(74,158,255,.4);border-radius:8px;color:var(--accent3);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;letter-spacing:.03em;">
-      📋 カテゴリーを全写真の備考欄に一括反映
-    </button>
     <div class="upload-area blue" id="s-uploadArea">
       <div class="icon">🗾</div>
       <p><strong>タップして写真を選択</strong></p>
@@ -308,7 +317,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
   </div>
 </main>
 <div class="fab-area">
-  <button class="fab" style="background:#2E7D5B;font-size:20px;padding:10px;width:46px;height:46px;border-radius:50%;justify-content:center;" title="今すぐ保存" onclick="sAutosave().then(()=>showToast('保存しました'))">💾</button>
+  <div class="save-status" id="s-saveStatus"></div>
   <button class="fab fab-pdf-sokuryou" onclick="sGeneratePDF()">📄 PDF出力（測量）</button>
 </div>
 </div>
@@ -454,8 +463,58 @@ async function idbClear() {
 // =========================================================
 //  杭打ち：IndexedDB 自動保存・復元
 // =========================================================
+// ===== 保存状態インジケーター =====
+// state: 'saving' | 'saved' | 'error' | '' （空文字で非表示）
+function setSaveStatus(tab, state){
+  const el = document.getElementById(tab + '-saveStatus');
+  if(!el) return;
+  clearTimeout(el._hideTimer);
+  el.className = 'save-status';
+  if(!state){ return; }
+  el.classList.add('on', state);
+  el.textContent = state==='saving' ? '保存中…'
+                 : state==='saved'  ? '✓ 保存済み'
+                 : '⚠ 保存できません';
+  if(state==='saved'){
+    // 保存済み表示は数秒で自動的に引っ込める（PDFボタンの邪魔をしないため）
+    el._hideTimer = setTimeout(()=>{ el.className='save-status'; }, 2500);
+  }
+}
+
+// ===== 自動保存のスケジューリング =====
+// 未保存の変更があるかをタブごとに保持し、離脱時のフラッシュ対象を判断する
+function scheduleG(ms){
+  window._gDirty = true;
+  clearTimeout(window._gAutoSaveTimer);
+  window._gAutoSaveTimer = setTimeout(gAutosave, ms);
+}
+function scheduleS(ms){
+  window._sDirty = true;
+  clearTimeout(window._sAutoSaveTimer);
+  window._sAutoSaveTimer = setTimeout(sAutosave, ms);
+}
+
+// ===== 離脱時に保留中の保存を確定させる =====
+// 自動保存には1〜1.5秒の待ち時間があるため、その間にアプリを閉じると
+// 最後の編集が失われる。画面が非表示になった時点で即座に書き込む。
+function flushAutosave(){
+  if(window._gDirty && typeof photos!=='undefined' && photos.length){
+    clearTimeout(window._gAutoSaveTimer);
+    gAutosave();
+  }
+  if(window._sDirty && typeof sPhotos!=='undefined' && sPhotos.length){
+    clearTimeout(window._sAutoSaveTimer);
+    sAutosave();
+  }
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'hidden') flushAutosave();
+});
+window.addEventListener('pagehide', flushAutosave);
+
 async function gAutosave() {
-  if(!photos.length) return;
+  if(!photos.length){ window._gDirty=false; setSaveStatus('g',''); return; }
+  setSaveStatus('g','saving');
   try {
     const meta = photos.map(p=>({id:p.id, circles:p.circles, pointNum:p.pointNum||''}));
     await idbSave('g_meta', JSON.stringify(meta));
@@ -463,7 +522,9 @@ async function gAutosave() {
     await idbSave('g_pdfOrder', JSON.stringify(pdfOrder));
     for(const p of photos){ await idbSave('g_img_'+p.id, p.src); }
     await idbSave('g_ids', JSON.stringify(photos.map(p=>p.id)));
-  } catch(e){ console.warn('genba autosave error:',e); }
+    window._gDirty = false;
+    setSaveStatus('g','saved');
+  } catch(e){ console.warn('genba autosave error:',e); setSaveStatus('g','error'); }
 }
 async function gRestore() {
   try {
@@ -492,7 +553,8 @@ async function gClearSaved() {
 
 // 測量データをIndexedDBに保存（写真srcは別キーで保存）
 async function sAutosave() {
-  if(!sPhotos.length) return;
+  if(!sPhotos.length){ window._sDirty=false; setSaveStatus('s',''); return; }
+  setSaveStatus('s','saving');
   try {
     // メタデータ（src以外）を保存
     const meta = sPhotos.map(p=>({
@@ -507,7 +569,9 @@ async function sAutosave() {
     }
     // IDリスト
     await idbSave('s_ids', JSON.stringify(sPhotos.map(p=>p.id)));
-  } catch(e){ console.warn('autosave error:',e); }
+    window._sDirty = false;
+    setSaveStatus('s','saved');
+  } catch(e){ console.warn('autosave error:',e); setSaveStatus('s','error'); }
 }
 
 // 復元
@@ -891,7 +955,7 @@ function initDragSort(listEl, getArray, setArray, onSorted, isSokuryou=false){
     showToast('順番を変更しました');
     dragId = null;
     // 測量の場合は自動保存
-    if(typeof sPhotos!=='undefined'&&arr===sPhotos){ clearTimeout(window._sAutoSaveTimer); window._sAutoSaveTimer=setTimeout(sAutosave,1000); }
+    if(typeof sPhotos!=='undefined'&&arr===sPhotos){ scheduleS(1000); }
   }
 }
 
@@ -944,7 +1008,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     true
   );
 });
-document.getElementById('fieldName').addEventListener('input', ()=>{saveField();clearTimeout(window._gAutoSaveTimer);window._gAutoSaveTimer=setTimeout(gAutosave,1500);});
+document.getElementById('fieldName').addEventListener('input', ()=>{saveField();scheduleG(1500);});
 
 function isKinkei(pdfIdx){return pdfIdx%2===0;}
 
@@ -960,7 +1024,7 @@ function handleFiles(files){
       // 長辺1920pxにリサイズしてメモリ削減
       const resized=await resizeImage(ev.target.result,1280);
       buf[i]={id:'p'+Date.now()+'_'+i,src:resized,circles:[],pointNum:''};
-      if(++loaded===arr.length){photos=photos.concat(buf);pdfOrder=photos.map(p=>p.id);renderAll();clearTimeout(window._gAutoSaveTimer);window._gAutoSaveTimer=setTimeout(gAutosave,1000);}
+      if(++loaded===arr.length){photos=photos.concat(buf);pdfOrder=photos.map(p=>p.id);renderAll();scheduleG(1000);}
     };reader.readAsDataURL(file);
   });
 }
@@ -1041,7 +1105,7 @@ function onPointInput(id,val){
 function deletePhoto(id){
   photos=photos.filter(x=>x.id!==id);pdfOrder=pdfOrder.filter(x=>x!==id);
   delete canvasState[id];if(popupTargetId===id)closeNumPopup();renderAll();
-  clearTimeout(window._gAutoSaveTimer);window._gAutoSaveTimer=setTimeout(gAutosave,1000);
+  scheduleG(1000);
 }
 function replacePhotoClick(id){const el=document.getElementById("repl_"+id);if(el)el.click();}
 function replacePhoto(id,input){
@@ -1126,7 +1190,7 @@ function onStart_g(e,id,canvas){
       ph.circles.splice(minI,1);
       redrawCanvas_g(id);
       showToast('赤丸を削除しました');
-      clearTimeout(window._gAutoSaveTimer);window._gAutoSaveTimer=setTimeout(gAutosave,1000);
+      scheduleG(1000);
     }
     return;
   }
@@ -1191,7 +1255,7 @@ function undoCircle(id){
     const s=canvasState[id];
     if(s&&s.selectedIdx>=p.circles.length) s.selectedIdx=-1;
     redrawCanvas_g(id);
-    clearTimeout(window._gAutoSaveTimer);window._gAutoSaveTimer=setTimeout(gAutosave,1000);
+    scheduleG(1000);
   }
 }
 // 選択中の赤丸だけを削除
@@ -1206,7 +1270,7 @@ function deleteSelectedCircle_g(id){
   s.selectedIdx=-1;
   redrawCanvas_g(id);
   showToast('赤丸を1つ削除しました');
-  clearTimeout(window._gAutoSaveTimer);window._gAutoSaveTimer=setTimeout(gAutosave,1000);
+  scheduleG(1000);
 }
 function clearCircles(id){const p=photos.find(x=>x.id===id);if(p){p.circles=[];redrawCanvas_g(id);}}
 
@@ -1417,7 +1481,7 @@ function sRenderAll(){
     bikoTA.placeholder='前面道路\n申請地\n北側隣接地\nKBM など';
     bikoTA.value=p.biko||'';
     bikoTA.rows=6;
-    bikoTA.oninput=()=>{p.biko=bikoTA.value; clearTimeout(bikoTA._st); bikoTA._st=setTimeout(sAutosave,1500);};
+    bikoTA.oninput=()=>{p.biko=bikoTA.value; scheduleS(1500);};
     bikoRight.appendChild(bikoLabel);
     bikoRight.appendChild(bikoTA);
 
@@ -1441,22 +1505,6 @@ function sRenderAll(){
 
 
 
-// ===== カテゴリー一括反映 =====
-function sApplyAllCategories(){
-  sPhotos.forEach(p=>{
-    const label=sCatLabel(p);
-    const ta=document.querySelector('#catrow_'+p.id)?.closest('.photo-card')?.querySelector('.biko-textarea');
-    // bikoの先頭行をカテゴリーラベルで置換（または先頭に追加）
-    const lines=(p.biko||'').split('\n');
-    const isLabel=S_CATS.some(c=>lines[0].startsWith(c.label));
-    if(isLabel||!lines[0]){lines[0]=label;}else{lines.unshift(label);}
-    p.biko=lines.join('\n');
-    if(ta){ta.value=p.biko;}
-  });
-  showToast('全写真の備考欄にカテゴリーを反映しました');
-  clearTimeout(window._sAutoSaveTimer); window._sAutoSaveTimer=setTimeout(sAutosave,1000);
-}
-
 // ===== カテゴリー行描画 =====
 function sRenderCatRow(p){
   // sPhotos配列内の実オブジェクトを参照（確実に同一オブジェクトを操作）
@@ -1478,7 +1526,7 @@ function sRenderCatRow(p){
     if(target){ target.catId=sel.value; target.catSubs={}; }
     photo.catId=sel.value; photo.catSubs={};
     sRenderCatRow(photo);
-    clearTimeout(window._sAutoSaveTimer); window._sAutoSaveTimer=setTimeout(sAutosave,1000);
+    scheduleS(1000);
   };
   row.appendChild(sel);
   // サブ入力欄（方角はプルダウン、その他はテキスト）
@@ -1499,8 +1547,7 @@ function sRenderCatRow(p){
         if(!photo.catSubs)photo.catSubs={};
         photo.catSubs[s.key]=inp.value;
         if(target){ if(!target.catSubs)target.catSubs={}; target.catSubs[s.key]=inp.value; }
-        clearTimeout(window._sAutoSaveTimer);
-        window._sAutoSaveTimer=setTimeout(sAutosave,1500);
+        scheduleS(1500);
       };
       row.appendChild(inp);
       return;
@@ -1521,8 +1568,7 @@ function sRenderCatRow(p){
         if(!photo.catSubs)photo.catSubs={};
         photo.catSubs[s.key]=inp.value;
         if(target){ if(!target.catSubs)target.catSubs={}; target.catSubs[s.key]=inp.value; }
-        clearTimeout(window._sAutoSaveTimer);
-        window._sAutoSaveTimer=setTimeout(sAutosave,1500);
+        scheduleS(1500);
       };
     } else {
       // テキスト入力
@@ -1535,8 +1581,7 @@ function sRenderCatRow(p){
         if(!photo.catSubs)photo.catSubs={};
         photo.catSubs[s.key]=inp.value;
         if(target){ if(!target.catSubs)target.catSubs={}; target.catSubs[s.key]=inp.value; }
-        clearTimeout(window._sAutoSaveTimer);
-        window._sAutoSaveTimer=setTimeout(sAutosave,1500);
+        scheduleS(1500);
       };
     }
     row.appendChild(inp);
@@ -1635,7 +1680,7 @@ function sOnStart(e,id,canvas){
       s.selectedIdx=-1; s.handleMode=null;
       sRedraw(id);
       showToast('赤丸を削除しました');
-      clearTimeout(window._sAutoSaveTimer);window._sAutoSaveTimer=setTimeout(sAutosave,1000);
+      scheduleS(1000);
     }
     return;
   }
@@ -1737,8 +1782,7 @@ function sOnEnd(e,id,canvas){
     }
     sRedraw(id);
     // 赤丸描画後に自動保存（1秒後）
-    clearTimeout(window._sAutoSaveTimer);
-    window._sAutoSaveTimer=setTimeout(sAutosave,1000);
+    scheduleS(1000);
   }else if(s.mode==='move'){s.dragIdx=-1;canvas.classList.remove('grabbing');}
   else if(s.mode==='select'){s.handleMode=null;}
 }
@@ -1792,7 +1836,7 @@ function sUndoCircle(id){
     const s=sCanvasState[id];
     if(s&&s.selectedIdx>=p.circles.length) s.selectedIdx=-1;
     sRedraw(id);
-    clearTimeout(window._sAutoSaveTimer);window._sAutoSaveTimer=setTimeout(sAutosave,1000);
+    scheduleS(1000);
   }
 }
 // 選択中の赤丸だけを削除（☞選択モードまたは✋移動モードで選択）
@@ -1808,7 +1852,7 @@ function sDeleteSelectedCircle(id){
   s.handleMode=null;
   sRedraw(id);
   showToast('赤丸を1つ削除しました');
-  clearTimeout(window._sAutoSaveTimer);window._sAutoSaveTimer=setTimeout(sAutosave,1000);
+  scheduleS(1000);
 }
 function sClearCircles(id){const p=sPhotos.find(x=>x.id===id);if(p){p.circles=[];sRedraw(id);}}
 
@@ -1900,7 +1944,10 @@ async function sGeneratePDF(){
           const MAX_W=BIKO_W-6;
           let lineY=slotY+10;
           const bikoLines=(p.biko||'').split('\n').filter(l=>l.trim());
-          const filtered=bikoLines.filter(l=>!S_CATS.some(c=>l.startsWith(c.label)));
+          // 旧「一括反映」で書き込まれたラベル行のみ除外（完全一致）。
+          // 以前は行頭一致で判定していたため、「隣接地の塀が…」等の備考が消えていた。
+          const ownLabel=sCatLabel(p);
+          const filtered=bikoLines.filter(l=>l.trim()!==ownLabel);
           if(p.catId==='encr'){
             // 越境物：箇条書き表示
             lineY=addWrappedTextToPDF(doc,'越境物',DIVIDER_X+3,lineY,FONT_SIZE,MAX_W,LINE_H);
