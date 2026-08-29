@@ -29,7 +29,7 @@
   --shadow:0 1px 3px rgba(27,58,92,.08),0 1px 2px rgba(27,58,92,.06);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{background:var(--bg);color:var(--text);font-family:'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;min-height:100vh;padding-bottom:100px;}
+body{background:var(--bg);color:var(--text);font-family:'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;min-height:100vh;padding-bottom:20px;}
 
 /* ===== TABS ===== */
 .tab-header{background:#F1EDE8;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
@@ -169,6 +169,29 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 .zoom-canvas-area canvas.mode-draw{cursor:crosshair;}
 .zoom-canvas-area canvas.mode-move{cursor:grab;}
 
+
+/* ===== フッター ===== */
+.app-footer{
+  text-align:center;
+  padding:22px 16px 26px;
+  font-size:12px;
+  color:var(--text2);
+  border-top:1px solid var(--border);
+  margin-top:8px;
+}
+.app-footer a{
+  color:var(--navy);
+  text-decoration:none;
+  border-bottom:1px solid rgba(27,58,92,.3);
+  padding-bottom:1px;
+}
+.app-footer a:hover{border-bottom-color:var(--navy);}
+.app-footer .sep{margin:0 8px; opacity:.5;}
+.app-footer .copy{display:block; margin-top:7px; opacity:.75;}
+@media(max-width:420px){
+  .app-footer{font-size:11px; padding:18px 12px 22px;}
+}
+
 /* ===== FAB ===== */
 .fab-area{position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-end;z-index:200;}
 .fab{color:#fff;border:none;border-radius:50px;padding:13px 20px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:7px;box-shadow:0 4px 14px rgba(27,58,92,.28);}
@@ -286,6 +309,11 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
   <button class="fab fab-pdf-sokuryou" onclick="sGeneratePDF()">📄 PDF出力（測量）</button>
 </div>
 </div>
+
+<footer class="app-footer">
+  <a href="legal.html">ご利用にあたって（利用規約・免責事項・プライバシーポリシー・動作環境）</a>
+  <span class="copy">© ORSA</span>
+</footer>
 
 <!-- ポップアップ（現場用） -->
 <div class="popup-overlay" id="popupOverlay" onclick="closeNumPopup()"></div>
