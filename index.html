@@ -190,6 +190,9 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 .app-footer .copy{display:block; margin-top:7px; opacity:.75;}
 @media(max-width:420px){
   .app-footer{font-size:11px; padding:18px 12px 22px;}
+  .app-footer .sep{display:none;}
+  .app-footer .foot-links a{display:block; width:fit-content; margin:0 auto 9px;}
+  .app-footer .foot-links a:last-child{margin-bottom:0;}
 }
 
 /* ===== FAB ===== */
@@ -235,7 +238,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
     </div>
     <div class="brand-fallback" id="brandFallback"><span class="hy">HYMY</span>×<span>ORSA</span></div>
     <div>
-      <div class="app-title">写真集作成ツール <span style="font-size:10px;color:var(--text2);font-weight:400;">v9.7</span></div>
+      <div class="app-title">写真集作成ツール <span style="font-size:10px;color:var(--text2);font-weight:400;">v9.8</span></div>
     </div>
   </div>
   <div class="tab-bar">
@@ -311,7 +314,11 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
 </div>
 
 <footer class="app-footer">
-  <a href="legal.html">ご利用にあたって（利用規約・免責事項・プライバシーポリシー・動作環境）</a>
+  <span class="foot-links">
+    <a href="legal.html">ご利用にあたって（利用規約・免責事項・プライバシーポリシー・動作環境）</a>
+    <span class="sep">|</span>
+    <a href="https://forms.gle/9aN9x7eJzf7nfnct7" target="_blank" rel="noopener">お問い合わせ・不具合報告</a>
+  </span>
   <span class="copy">© ORSA</span>
 </footer>
 
