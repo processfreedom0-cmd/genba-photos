@@ -250,7 +250,7 @@ input[type="range"]{flex:1;accent-color:var(--accent);}
     </div>
     <div class="brand-fallback" id="brandFallback"><span class="hy">HYMY</span>×<span>ORSA</span></div>
     <div>
-      <div class="app-title">写真集作成ツール <span style="font-size:10px;color:var(--text2);font-weight:400;">v9.11</span></div>
+      <div class="app-title">写真集作成ツール <span style="font-size:10px;color:var(--text2);font-weight:400;">v9.12</span></div>
     </div>
   </div>
   <div class="tab-bar">
@@ -725,16 +725,21 @@ function hideProgress(){document.getElementById('progressOverlay').classList.rem
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function gp(e,canvas){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*(canvas.width/r.width),y:(e.clientY-r.top)*(canvas.height/r.height)};}
 // 赤丸の線幅は画像の解像度に比例させる。
-// 固定値だと、解像度の高い写真ほど表示上の赤丸が細く見えてしまうため。
-// 基準：長辺1280pxのとき従来と同じ太さになる。
-function redLineWidth(ctx,base){
-  const L=Math.max(ctx.canvas?ctx.canvas.width:1280, ctx.canvas?ctx.canvas.height:1280)||1280;
-  return Math.max(L*base/1280, 3);
+// 固定値だと、解像度の高い写真ほど表示上の赤丸が細く見えてしまう。
+//
+// 画面上：キャンバスは常に横幅いっぱい（width:100%）で表示されるため、
+//         画像の「横幅」を基準にすると、どの写真でも同じ太さに見える。
+// PDF上 ：横長は幅に、縦長は高さに合わせて配置されるため、
+//         「長辺」を基準にする（PDF生成側から basis を渡す）。
+// いずれも長辺1280pxの横長写真で従来と同じ太さになる。
+function redLineWidth(ctx,base,basis){
+  const ref = basis || (ctx.canvas ? ctx.canvas.width : 1280) || 1280;
+  return Math.max(ref*base/1280, 3);
 }
-function drawCircle(ctx,cx,cy,r,preview=false){
+function drawCircle(ctx,cx,cy,r,preview=false,basis=null){
   if(r<3)return;
-  ctx.save();ctx.strokeStyle='#ff1111';ctx.lineWidth=redLineWidth(ctx,12);
-  ctx.shadowColor='rgba(255,0,0,0.35)';ctx.shadowBlur=redLineWidth(ctx,10);
+  ctx.save();ctx.strokeStyle='#ff1111';ctx.lineWidth=redLineWidth(ctx,12,basis);
+  ctx.shadowColor='rgba(255,0,0,0.35)';ctx.shadowBlur=redLineWidth(ctx,10,basis);
   if(preview)ctx.globalAlpha=0.55;
   ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();ctx.restore();
 }
@@ -1297,7 +1302,8 @@ async function getPhotoSrc_g(p,kinkei){
         oc.width=img.width; oc.height=img.height;
         const ctx=oc.getContext('2d');
         ctx.drawImage(img,0,0);
-        (p.circles||[]).forEach(c=>drawCircle(ctx,c.cx,c.cy,c.r));
+        const basis=Math.max(img.width,img.height); // PDFは長辺に合わせて配置される
+        (p.circles||[]).forEach(c=>drawCircle(ctx,c.cx,c.cy,c.r,false,basis));
         const d=oc.toDataURL('image/jpeg',0.50);
         clearTimeout(timer);
         res(d);
@@ -1797,12 +1803,12 @@ function sOnEnd(e,id,canvas){
   }else if(s.mode==='move'){s.dragIdx=-1;canvas.classList.remove('grabbing');}
   else if(s.mode==='select'){s.handleMode=null;}
 }
-function drawEllipse(ctx,cx,cy,rx,ry,rot,preview=false){
+function drawEllipse(ctx,cx,cy,rx,ry,rot,preview=false,basis=null){
   if(rx<2&&ry<2)return;
   ctx.save();
   ctx.strokeStyle='#ff1111';
-  ctx.lineWidth=redLineWidth(ctx,15);
-  ctx.shadowColor='rgba(255,0,0,0.35)';ctx.shadowBlur=redLineWidth(ctx,10);
+  ctx.lineWidth=redLineWidth(ctx,15,basis);
+  ctx.shadowColor='rgba(255,0,0,0.35)';ctx.shadowBlur=redLineWidth(ctx,10,basis);
   if(preview)ctx.globalAlpha=0.5;
   ctx.beginPath();ctx.ellipse(cx,cy,Math.max(rx,2),Math.max(ry,2),rot||0,0,Math.PI*2);ctx.stroke();
   ctx.restore();
@@ -1881,7 +1887,7 @@ async function getSokuryouSrc(p){
         (p.circles||[]).forEach(c=>{
           const rx=c.rx!==undefined?c.rx:(c.r||10);
           const ry=c.ry!==undefined?c.ry:(c.r||10);
-          drawEllipse(ctx,c.cx,c.cy,rx,ry,c.rot||0);
+          drawEllipse(ctx,c.cx,c.cy,rx,ry,c.rot||0,false,Math.max(img.width,img.height));
         });
         requestAnimationFrame(()=>{
           try{
